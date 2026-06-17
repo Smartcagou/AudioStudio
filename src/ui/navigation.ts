@@ -5,4 +5,5 @@ export type RootStackParamList = {
   Home: undefined;
   Player: undefined;
   Engineering: undefined;
+  Mixer: undefined;
 };

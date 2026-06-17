@@ -8,6 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from './src/ui/HomeScreen';
 import { PlayerScreen } from './src/ui/PlayerScreen';
 import { EngineeringScreen } from './src/ui/EngineeringScreen';
+import { MixerScreen } from './src/ui/MixerScreen';
 import { RootStackParamList } from './src/ui/navigation';
 import { initDatabase } from './src/storage/database';
 import { setupLibraryPlayer } from './src/player/LibraryPlayer';
@@ -64,6 +65,11 @@ export default function App() {
             name="Engineering"
             component={EngineeringScreen}
             options={{ title: 'Ingenierie sonore' }}
+          />
+          <Stack.Screen
+            name="Mixer"
+            component={MixerScreen}
+            options={{ title: 'Mixage multipiste' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

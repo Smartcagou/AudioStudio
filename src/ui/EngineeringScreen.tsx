@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Metronome } from '../audio/metronome/Metronome';
 import { Recorder } from '../audio/recorder/Recorder';
 import { addRecordingToLibrary } from '../library/LibraryManager';
+import { RootStackParamList } from './navigation';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Engineering'>;
 
 const MIN_BPM = 40;
 const MAX_BPM = 240;
 
-export function EngineeringScreen() {
+export function EngineeringScreen({ navigation }: Props) {
   const metronomeRef = useRef<Metronome | null>(null);
   if (metronomeRef.current === null) {
     metronomeRef.current = new Metronome(getAudioEngine());
@@ -106,6 +110,14 @@ export function EngineeringScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.navButton}
+        onPress={() => navigation.navigate('Mixer')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.navButtonText}>Mixage multipiste</Text>
+      </TouchableOpacity>
+
       <Text style={styles.sectionTitle}>Metronome</Text>
 
       <View style={styles.bpmRow}>
@@ -174,6 +186,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingHorizontal: 24,
     paddingTop: 24,
+  },
+  navButton: {
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#111111',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  navButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111111',
   },
   sectionTitle: {
     fontSize: 15,

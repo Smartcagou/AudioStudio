@@ -116,6 +116,17 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
 
 ## Journal de session
 
+### 2026-06-17 — Session 3 (suite 4) : commit/push Lot 1 + début Lot 2 (mixage multipiste)
+
+- Lot 1 commité sur branche `lot-1-socle` et poussé sur origin. NB : remote basculé en SSH (`git@github.com:Smartcagou/AudioStudio.git`) car HTTPS sans credentials ; clé `~/.ssh/id_ed25519` authentifie comme Smartcagou. `.claude/settings.json` volontairement exclu du commit (config outillage).
+- Début Lot 2 — mixage multipiste (sur le moteur temps réel, distinct de LibraryPlayer, DA-001) :
+  - `src/audio/mixer/Track.ts` : classe Track. Graphe source->gain->panner->master. `decodeAudioData(uri)` -> AudioBuffer ; source recréée à chaque start (sources Web Audio à usage unique). gainDb (dbToLinear), pan (StereoPanner -1..1), mute.
+  - `src/audio/mixer/Mixer.ts` : bus master (GainNode->destination), addTrack/removeTrack, `playAll()` démarre toutes les pistes au même `when` (currentTime+0.1) -> départ synchronisé à l'échantillon, stopAll, masterGain, clear.
+  - `src/ui/MixerScreen.tsx` : charge toute la bibliothèque en pistes, gain +/-3 dB, pan G/C/D, mute, Tout lire/Arreter. Accès via bouton sur EngineeringScreen (route Mixer).
+- typecheck OK, pur JS (pas de rebuild), bundle rechargé sans crash. Décodage seulement à l'ouverture de l'écran Mixer.
+- Mixage multipiste VALIDE UTILISATEUR (lecture simultanée synchronisée, gain/pan/mute OK). `decodeAudioData` accepte donc bien les URI file:// (pas besoin de stripper).
+- Reste Lot 2 : monitoring faible latence, looper synchronisé (overdub) sur getClock(), premiers effets biquad. Commit du mixer à faire (idéalement branche dédiée).
+
 ### 2026-06-17 — Session 3 (suite 3) : enregistreur micro (fin Lot 1)
 
 - LOT 1 TERMINE ET VALIDE UTILISATEUR : build/APK sur S21, lecteur multi-formats + bibliothèque, métronome, enregistreur WAV (enregistrement->écoute OK).
