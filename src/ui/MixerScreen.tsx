@@ -10,7 +10,7 @@ import {
 
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Mixer } from '../audio/mixer/Mixer';
-import { TrackInfo } from '../audio/mixer/Track';
+import { TrackFilterType, TrackInfo } from '../audio/mixer/Track';
 import { listFiles } from '../library/LibraryManager';
 
 export function MixerScreen() {
@@ -81,6 +81,25 @@ export function MixerScreen() {
     refresh();
   }
 
+  function setFilter(id: string, type: TrackFilterType | 'none') {
+    const track = findTrack(id);
+    if (!track) return;
+    if (type === 'none') {
+      track.setFilterEnabled(false);
+    } else {
+      track.setFilterType(type);
+      track.setFilterEnabled(true);
+    }
+    refresh();
+  }
+
+  function scaleFilterFrequency(id: string, factor: number) {
+    const track = findTrack(id);
+    if (!track) return;
+    track.setFilterFrequency(Math.round(track.getInfo().filterFrequency * factor));
+    refresh();
+  }
+
   function togglePlay() {
     if (playing) {
       mixer.stopAll();
@@ -137,6 +156,34 @@ export function MixerScreen() {
                 <PanButton label="C" active={track.pan === 0} onPress={() => setPan(track.id, 0)} />
                 <PanButton label="D" active={track.pan > 0} onPress={() => setPan(track.id, 1)} />
               </View>
+
+              <View style={styles.controlRow}>
+                <Text style={styles.controlLabel}>Filtre</Text>
+                <PanButton
+                  label="Aucun"
+                  active={!track.filterEnabled}
+                  onPress={() => setFilter(track.id, 'none')}
+                />
+                <PanButton
+                  label="Pass-bas"
+                  active={track.filterEnabled && track.filterType === 'lowpass'}
+                  onPress={() => setFilter(track.id, 'lowpass')}
+                />
+                <PanButton
+                  label="Pass-haut"
+                  active={track.filterEnabled && track.filterType === 'highpass'}
+                  onPress={() => setFilter(track.id, 'highpass')}
+                />
+              </View>
+
+              {track.filterEnabled ? (
+                <View style={styles.controlRow}>
+                  <Text style={styles.controlLabel}>Freq</Text>
+                  <SmallButton label="-" onPress={() => scaleFilterFrequency(track.id, 1 / 1.5)} />
+                  <Text style={styles.controlValue}>{track.filterFrequency} Hz</Text>
+                  <SmallButton label="+" onPress={() => scaleFilterFrequency(track.id, 1.5)} />
+                </View>
+              ) : null}
             </View>
           ))
         )}

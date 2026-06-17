@@ -2,11 +2,14 @@ import {
   AudioBuffer,
   AudioBufferSourceNode,
   AudioNode,
+  BiquadFilterNode,
   GainNode,
   StereoPannerNode,
 } from 'react-native-audio-api';
 
 import { AudioEngine } from '../engine/AudioEngine';
+
+export type TrackFilterType = 'lowpass' | 'highpass';
 
 // État sérialisable d'une piste, utilisé par l'interface.
 export interface TrackInfo {
@@ -17,7 +20,13 @@ export interface TrackInfo {
   pan: number;
   muted: boolean;
   durationSec: number;
+  filterEnabled: boolean;
+  filterType: TrackFilterType;
+  filterFrequency: number;
 }
+
+// Champs fournis à la création ; le reste a des valeurs par défaut.
+export type TrackInit = Pick<TrackInfo, 'id' | 'name' | 'uri' | 'gainDb' | 'pan' | 'muted'>;
 
 export function dbToLinear(db: number): number {
   return Math.pow(10, db / 20);
@@ -34,14 +43,18 @@ export class Track {
   private pan: number;
   private muted: boolean;
   private durationSec = 0;
+  private filterEnabled = false;
+  private filterType: TrackFilterType = 'lowpass';
+  private filterFrequency = 1000;
 
   private readonly engine: AudioEngine;
   private readonly gainNode: GainNode;
   private readonly pannerNode: StereoPannerNode;
+  private readonly filterNode: BiquadFilterNode;
   private buffer: AudioBuffer | null = null;
   private source: AudioBufferSourceNode | null = null;
 
-  constructor(engine: AudioEngine, info: Omit<TrackInfo, 'durationSec'>, master: AudioNode) {
+  constructor(engine: AudioEngine, info: TrackInit, master: AudioNode) {
     this.engine = engine;
     this.id = info.id;
     this.name = info.name;
@@ -53,11 +66,23 @@ export class Track {
     const context = engine.getContext();
     this.gainNode = context.createGain();
     this.pannerNode = context.createStereoPanner();
-    this.gainNode.connect(this.pannerNode);
+    this.filterNode = context.createBiquadFilter();
+    this.filterNode.type = this.filterType;
+    this.filterNode.frequency.value = this.filterFrequency;
+
+    // Le filtre est toujours câblé vers le pan ; le bypass se fait en routant la
+    // sortie du gain soit vers le filtre, soit directement vers le pan.
+    this.filterNode.connect(this.pannerNode);
     this.pannerNode.connect(master);
+    this.routeChain();
 
     this.applyGain();
     this.pannerNode.pan.value = this.pan;
+  }
+
+  private routeChain(): void {
+    this.gainNode.disconnect();
+    this.gainNode.connect(this.filterEnabled ? this.filterNode : this.pannerNode);
   }
 
   async load(): Promise<void> {
@@ -100,10 +125,26 @@ export class Track {
     this.applyGain();
   }
 
+  setFilterEnabled(enabled: boolean): void {
+    this.filterEnabled = enabled;
+    this.routeChain();
+  }
+
+  setFilterType(type: TrackFilterType): void {
+    this.filterType = type;
+    this.filterNode.type = type;
+  }
+
+  setFilterFrequency(hz: number): void {
+    this.filterFrequency = Math.min(20000, Math.max(20, hz));
+    this.filterNode.frequency.value = this.filterFrequency;
+  }
+
   // Libère les noeuds natifs de la piste.
   dispose(): void {
     this.stop();
     this.gainNode.disconnect();
+    this.filterNode.disconnect();
     this.pannerNode.disconnect();
   }
 
@@ -120,6 +161,9 @@ export class Track {
       pan: this.pan,
       muted: this.muted,
       durationSec: this.durationSec,
+      filterEnabled: this.filterEnabled,
+      filterType: this.filterType,
+      filterFrequency: this.filterFrequency,
     };
   }
 }

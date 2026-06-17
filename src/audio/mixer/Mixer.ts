@@ -1,7 +1,7 @@
 import { GainNode } from 'react-native-audio-api';
 
 import { AudioEngine } from '../engine/AudioEngine';
-import { dbToLinear, Track, TrackInfo } from './Track';
+import { dbToLinear, Track, TrackInit } from './Track';
 
 // Mixage multipiste. Toutes les pistes partagent l'horloge du moteur et sont
 // sommées dans un bus master unique avant la sortie.
@@ -27,7 +27,7 @@ export class Mixer {
     return this.masterGain;
   }
 
-  async addTrack(info: Omit<TrackInfo, 'durationSec'>): Promise<Track> {
+  async addTrack(info: TrackInit): Promise<Track> {
     await this.engine.start();
     const master = this.ensureMaster();
     const track = new Track(this.engine, info, master);

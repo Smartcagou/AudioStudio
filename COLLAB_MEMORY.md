@@ -133,8 +133,13 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
   - `src/ui/LooperScreen.tsx` : choix mesures (1/2/4), Enregistrer la boucle, Overdub, Annuler derniere couche, Effacer. Avertissement casque. Accès via bouton EngineeringScreen (route Looper).
 - LIMITES CONNUES (assumées v1) : le timing de capture (début/durée) repose sur des setTimeout JS (jitter ~10-30 ms) et il y a une latence d'entrée micro non compensée -> léger offset de phase constant possible entre couches. La période est exacte (pas de dérive) mais l'alignement à beat 1 n'est pas sample-accurate. Compensation de latence = amélioration future (idéalement quand la lib exposera le réglage de buffer / un timestamp de capture).
 - typecheck OK, pur JS, bundle rechargé sans crash.
-- A VERIFIER A L'OREILLE (casque) : Enregistrer la boucle -> elle tourne ; Overdub -> la couche se superpose en phase ; Annuler/Effacer OK. Juger l'alignement rythmique.
-- Reste Lot 2 : premiers effets biquad (BiquadFilterNode sur les pistes du mixer). Looper à commiter une fois validé.
+- Looper VALIDE UTILISATEUR. Commité + poussé sur `lot-2-mixer`.
+- Premiers effets temps réel : filtre biquad par piste du mixer.
+  - `src/audio/mixer/Track.ts` : BiquadFilterNode inséré, bypass par reconnexion (gain -> filtre -> pan si actif, sinon gain -> pan). setFilterType ('lowpass'|'highpass'), setFilterFrequency (20-20000). TrackInfo étendu (filterEnabled/type/frequency) ; nouveau type TrackInit pour la création.
+  - `src/ui/MixerScreen.tsx` : par piste, choix Aucun/Passe-bas/Passe-haut + fréquence (x1.5 / /1.5).
+- typecheck OK, pur JS, bundle rechargé sans crash.
+- A VERIFIER A L'OREILLE : sur une piste du mixer, activer Passe-bas/Passe-haut pendant la lecture -> filtrage audible, fréquence ajustable, Aucun = transparent.
+- Lot 2 quasi bouclé (mixage + monitoring + looper + effets). Effets à commiter une fois validés. Surveiller la charge si beaucoup d'effets simultanés (CLAUDE.md). Ensuite Lot 3 : mixage final + export par piste, formats multiples dont MP3 (cas LAME), paramètres d'encodage, partage, lecture en arrière-plan.
 
 ### 2026-06-17 — Session 3 (suite 3) : enregistreur micro (fin Lot 1)
 
