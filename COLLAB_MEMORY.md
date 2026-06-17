@@ -11,10 +11,10 @@ Format : décision ou fait, puis **Pourquoi** et **Impact** sur une ligne chacun
 | Lot | Intitulé | Statut |
 | --- | -------- | ------ |
 | Lot 1 | Socle : build, lecteur, enregistreur + métronome | Terminé (validé utilisateur 2026-06-17) |
-| Lot 2 | Ingénierie sonore : mixage, looper, effets | Non commencé |
+| Lot 2 | Ingénierie sonore : mixage, looper, effets | Terminé (validé utilisateur 2026-06-17) |
 | Lot 3 | Export et finitions | Non commencé |
 
-**Lot actif :** Lot 2 — ingénierie sonore. Socle Lot 1 complet et validé sur S21 (build/APK, lecteur + bibliothèque, métronome sample-accurate, enregistreur WAV avec ajout auto à la bibliothèque).
+**Lot actif :** Lot 3 — export et finitions. Lots 1 et 2 complets et validés sur S21. Lot 2 = mixage multipiste + monitoring faible latence + looper synchronisé (overdub) + effets biquad, branche `lot-2-mixer` poussée.
 
 ---
 
@@ -115,6 +115,18 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
 ---
 
 ## Journal de session
+
+### 2026-06-17 — Session 3 (suite 5) : Lot 2 complet + début Lot 3 (export mix WAV)
+
+- Lot 2 TERMINE ET VALIDE : mixage multipiste + monitoring + looper + effets biquad. Tout sur branche `lot-2-mixer` (4 commits, poussés).
+- Début Lot 3 — export du mix final en WAV (choix utilisateur) :
+  - `src/audio/export/wav.ts` : encodeur WAV PCM 16 bits (Float32 interleavé -> int16, en-tête RIFF), sans dépendance.
+  - `src/audio/export/Exporter.ts` : `exportMixToWav(engine, tracks)` reconstruit le graphe (source+gain+pan+filtre) dans un `OfflineAudioContext`, `startRendering()` -> AudioBuffer, encode WAV, écrit dans Document via `expo-file-system` (`File.create()` + `File.write(Uint8Array)`). Pistes muettes exclues. Longueur = max durationSec des pistes.
+  - `src/library/LibraryManager.ts` : `addExportToLibrary()` (artist 'Mix').
+  - `src/ui/MixerScreen.tsx` : bouton "Exporter le mix (WAV)" -> rendu + ajout biblio + alerte.
+- Pur JS (OfflineAudioContext + expo-file-system), pas de rebuild. typecheck OK, bundle rechargé sans crash.
+- A VERIFIER A L'USAGE : Mixer > Exporter le mix (WAV) -> fichier mix-*.wav créé, apparait dans le Lecteur, lecture = somme des pistes avec gain/pan/filtres appliqués.
+- Reste Lot 3 : partage (expo-sharing -> NATIVE, rebuild requis), autres formats (AAC/M4A/FLAC/Opus via encodeur Android ; MP3 = cas LAME), export par piste, paramètres d'encodage, lecture arrière-plan (track-player gère déjà la notif). Export WAV à commiter une fois validé.
 
 ### 2026-06-17 — Session 3 (suite 4) : commit/push Lot 1 + début Lot 2 (mixage multipiste)
 

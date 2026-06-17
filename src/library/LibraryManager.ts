@@ -79,6 +79,33 @@ export async function addRecordingToLibrary(
   return file;
 }
 
+// Ajoute un mix exporté (déjà écrit dans le sandbox) à la bibliothèque.
+export async function addExportToLibrary(
+  filePath: string,
+  durationSec: number,
+): Promise<LibraryFile> {
+  const uri = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
+  const filename = filePath.split('/').pop() ?? 'mix.wav';
+  let sizeBytes = 0;
+  try {
+    sizeBytes = new File(uri).size ?? 0;
+  } catch {
+    sizeBytes = 0;
+  }
+  const file: LibraryFile = {
+    id: generateId(),
+    uri,
+    filename,
+    sizeBytes,
+    title: filename,
+    artist: 'Mix',
+    durationMs: Math.round(durationSec * 1000),
+    importedAt: Date.now(),
+  };
+  await insertLibraryFile(file);
+  return file;
+}
+
 export async function listFiles(): Promise<LibraryFile[]> {
   return listLibraryFiles();
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,7 +12,8 @@ import {
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Mixer } from '../audio/mixer/Mixer';
 import { TrackFilterType, TrackInfo } from '../audio/mixer/Track';
-import { listFiles } from '../library/LibraryManager';
+import { exportMixToWav } from '../audio/export/Exporter';
+import { addExportToLibrary, listFiles } from '../library/LibraryManager';
 
 export function MixerScreen() {
   const mixerRef = useRef<Mixer | null>(null);
@@ -23,6 +25,7 @@ export function MixerScreen() {
   const [tracks, setTracks] = useState<TrackInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const refresh = useCallback(() => {
     setTracks(mixer.getTracks().map((t) => t.getInfo()));
@@ -107,6 +110,23 @@ export function MixerScreen() {
     } else {
       mixer.playAll();
       setPlaying(true);
+    }
+  }
+
+  async function onExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const result = await exportMixToWav(
+        getAudioEngine(),
+        mixer.getTracks().map((t) => t.getInfo()),
+      );
+      const file = await addExportToLibrary(result.path, result.durationSec);
+      Alert.alert('Export', `Mix exporte (${result.durationSec.toFixed(1)} s) : ${file.filename}`);
+    } catch (err) {
+      Alert.alert('Export', err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -197,6 +217,17 @@ export function MixerScreen() {
           disabled={tracks.length === 0}
         >
           <Text style={styles.playButtonText}>{playing ? 'Arreter' : 'Tout lire'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.exportButton, (exporting || tracks.length === 0) && styles.exportButtonDisabled]}
+          onPress={onExport}
+          activeOpacity={0.7}
+          disabled={exporting || tracks.length === 0}
+        >
+          <Text style={styles.exportButtonText}>
+            {exporting ? 'Export en cours' : 'Exporter le mix (WAV)'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -361,5 +392,21 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  exportButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#111111',
+    alignItems: 'center',
+  },
+  exportButtonDisabled: {
+    opacity: 0.4,
+  },
+  exportButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111111',
   },
 });
