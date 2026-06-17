@@ -1,36 +1,27 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { AppState, ActiveModule, initialAppState } from '../state/store';
+import { RootStackParamList } from './navigation';
 
-export function HomeScreen() {
-  const [state, setState] = useState<AppState>(initialAppState);
+type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-  function selectModule(module: ActiveModule) {
-    setState((prev) => ({ ...prev, activeModule: module }));
-  }
-
+export function HomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>AudioStudio</Text>
-
       <ModuleButton
         label="Lecteur"
         description="Lecture multi-formats et bibliotheque"
-        active={state.activeModule === 'player'}
-        onPress={() => selectModule('player')}
+        onPress={() => navigation.navigate('Player')}
       />
       <ModuleButton
         label="Ingenierie sonore"
-        description="Enregistreur, mixage, looper, effets temps reel"
-        active={state.activeModule === 'engineering'}
-        onPress={() => selectModule('engineering')}
+        description="Metronome, enregistreur, mixage, looper, effets temps reel"
+        onPress={() => navigation.navigate('Engineering')}
       />
       <ModuleButton
         label="Export"
         description="Rendu et encodage multi-formats"
-        active={state.activeModule === 'export'}
-        onPress={() => selectModule('export')}
+        onPress={() => Alert.alert('Export', 'Disponible dans un prochain lot.')}
       />
     </View>
   );
@@ -39,18 +30,13 @@ export function HomeScreen() {
 interface ModuleButtonProps {
   label: string;
   description: string;
-  active: boolean;
   onPress: () => void;
 }
 
-function ModuleButton({ label, description, active, onPress }: ModuleButtonProps) {
+function ModuleButton({ label, description, onPress }: ModuleButtonProps) {
   return (
-    <TouchableOpacity
-      style={[styles.module, active && styles.moduleActive]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.moduleTitle, active && styles.moduleTitleActive]}>{label}</Text>
+    <TouchableOpacity style={styles.module} onPress={onPress} activeOpacity={0.7}>
+      <Text style={styles.moduleTitle}>{label}</Text>
       <Text style={styles.moduleText}>{description}</Text>
     </TouchableOpacity>
   );
@@ -61,13 +47,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     paddingHorizontal: 24,
-    paddingTop: 72,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '600',
-    marginBottom: 32,
-    color: '#111111',
+    paddingTop: 24,
   },
   module: {
     marginBottom: 16,
@@ -77,17 +57,10 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
     backgroundColor: '#fafafa',
   },
-  moduleActive: {
-    borderColor: '#111111',
-    backgroundColor: '#f0f0f0',
-  },
   moduleTitle: {
     fontSize: 17,
     fontWeight: '600',
     marginBottom: 4,
-    color: '#333333',
-  },
-  moduleTitleActive: {
     color: '#111111',
   },
   moduleText: {

@@ -10,26 +10,27 @@ Format : décision ou fait, puis **Pourquoi** et **Impact** sur une ligne chacun
 
 | Lot | Intitulé | Statut |
 | --- | -------- | ------ |
-| Lot 1 | Socle : build, lecteur, enregistreur + métronome | Non commencé |
+| Lot 1 | Socle : build, lecteur, enregistreur + métronome | Terminé (validé utilisateur 2026-06-17) |
 | Lot 2 | Ingénierie sonore : mixage, looper, effets | Non commencé |
 | Lot 3 | Export et finitions | Non commencé |
 
-**Lot actif :** Lot 1 — scaffold initialisé, implémentation à commencer.
+**Lot actif :** Lot 2 — ingénierie sonore. Socle Lot 1 complet et validé sur S21 (build/APK, lecteur + bibliothèque, métronome sample-accurate, enregistreur WAV avec ajout auto à la bibliothèque).
 
 ---
 
 ## Environnement de développement
 
-**Poste actif : Parrot OS (Linux) — migration depuis Windows 11 en cours.**
+**Poste actif : Parrot OS (Linux) — migration terminée, development build fonctionnel sur S21.**
 
-| Outil | Version (Windows) | Version requise | Statut |
-| ----- | ----------------- | --------------- | ------ |
-| OS | Windows 11 → Parrot OS | Linux ou Windows | Migration à faire |
-| Node.js | 24.16.0 | ^20.19.4 ou ^22.x ou ^24.x | A réinstaller sur Parrot |
-| npm | 11.12.0 | compatible | A réinstaller sur Parrot |
-| Expo SDK | ~56.0.12 | 56.x | OK (dans package.json) |
-| Android Studio / ADB | Non configuré (Windows) | SDK + platform-tools | A installer sur Parrot |
-| EAS CLI | — | >= 12.0.0 | A installer sur Parrot |
+| Outil | Version | Statut |
+| ----- | ------- | ------ |
+| OS | Parrot OS (Linux) | OK |
+| Node.js | 24.x | OK |
+| Expo SDK | ~56.0.12 | OK |
+| Android SDK / ADB | platform-tools | OK — S21 reconnu (RZCW709MFVX, SM-G990B2, Galaxy S21 FE) |
+| EAS CLI | >= 12.0.0 | A confirmer |
+
+**Contrainte matérielle : 8 Go de RAM.** Le build Android local sature le swap et a déjà gelé la machine (voir journal 2026-06-16 soir). Réglages mémoire pérennisés dans **`~/.gradle/gradle.properties`** (GRADLE_USER_HOME, hors projet) : `org.gradle.jvmargs=-Xmx1536m`, `parallel=false`, `workers.max=2`, `kotlin.daemon.jvmargs=-Xmx1024m`, `reactNativeArchitectures=arm64-v8a`. Cet emplacement a priorité sur le `gradle.properties` du projet et survit à `prebuild --clean` (le dossier `android/` est gitignoré et régénéré). N'affecte PAS les builds EAS cloud. NB : `expo-build-properties` ne couvre PAS jvmargs/parallel/workers (seulement `buildArchs`), d'où le choix de `~/.gradle`. Fermer Chrome pendant le build.
 
 ### Commandes de setup à lancer sur Parrot (première session)
 
@@ -80,6 +81,10 @@ npx expo run:android
 
 **Impact :** nécessite `@react-native-async-storage/async-storage` comme dépendance pair et un `PlaybackService` enregistré dans `index.ts`.
 
+**Patch New Architecture obligatoire (DA-003b) :** RNTP 4.1.2 crashe au chargement sous New Arch — `TurboModuleInteropUtils$ParsingException: returnType == void iff synchronous` sur `TrackPlayerModule`. Cause : ~37 méthodes `MusicModule.kt` en corps d'expression `fun x(...) = scope.launch { }` retournent `Job` au lieu de `Unit`. Correctif dans `patches/react-native-track-player+4.1.2.patch` : `.let {}` ajouté sur l'accolade fermante de chaque méthode (coerce le retour en `Unit`). Patch régénéré via `npx patch-package`, appliqué au `postinstall`. NE PAS désactiver la New Arch (react-native-audio-api l'exige, DA-002).
+
+Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`/lecture), `MusicService.emit`/`emitList` utilisaient `reactNativeHost.reactInstanceManager.currentReactContext` -> `RuntimeException: You should not use ReactNativeHost directly in the New Architecture` (FATAL). Corrigé en passant par `(applicationContext as ReactApplication).reactHost?.currentReactContext` (+ import `com.facebook.react.ReactApplication`). Les deux crashs RNTP sont donc dans le même fichier de patch. Leçon : RNTP 4.1.2 a plusieurs points d'incompatibilité New Arch, valider chaque chemin (chargement module ET émission d'événements).
+
 ### DA-004 — expo-sqlite pour la persistance
 
 **Pourquoi :** solution embarquée, pas de réseau, mono-utilisateur. Correspond exactement au périmètre actuel (projets, pistes, réglages).
@@ -96,8 +101,9 @@ npx expo run:android
 
 ## Blockers actuels
 
-- [ ] **Migration vers Parrot OS** : Node, Android SDK, ADB à installer. Voir section "Commandes de setup" ci-dessus.
-- [ ] **Android Studio / ADB absent sur Windows** : non bloquant, résolu sur Parrot.
+- [x] ~~Migration vers Parrot OS~~ : résolu. Node, Android SDK, ADB OK, S21 reconnu, dev build lancé.
+- [ ] **RAM 8 Go** : contrainte persistante, pas un blocker mais à surveiller. Basculer sur `eas build` si les gels reviennent.
+- [x] ~~Réglages mémoire à pérenniser~~ : fait dans `~/.gradle/gradle.properties` (survit à prebuild --clean, prioritaire sur le projet).
 
 ---
 
@@ -109,6 +115,50 @@ npx expo run:android
 ---
 
 ## Journal de session
+
+### 2026-06-17 — Session 3 (suite 3) : enregistreur micro (fin Lot 1)
+
+- LOT 1 TERMINE ET VALIDE UTILISATEUR : build/APK sur S21, lecteur multi-formats + bibliothèque, métronome, enregistreur WAV (enregistrement->écoute OK).
+- Métronome validé utilisateur.
+- `src/audio/recorder/Recorder.ts` : wrapper `AudioRecorder` (react-native-audio-api). Permission micro gérée nativement par la lib via `AudioManager.checkRecordingPermissions()` / `requestRecordingPermissions()` (`PermissionStatus = 'Granted'|'Denied'|'Undetermined'`) -> pas besoin de PermissionsAndroid externe. Sortie fichier WAV mono dans `FileDirectory.Document`, prefix `rec-`. `stop()` renvoie `FileInfo {paths, size (Mo), duration (s)}`. Départ ancré sur `engine.getClock().frame` (réf. pour le looper Lot 2).
+- `src/library/LibraryManager.ts` : `addRecordingToLibrary()` insère la prise dans `library_files` -> relisible immédiatement dans le Lecteur (boucle enregistrement->écoute).
+- `src/ui/EngineeringScreen.tsx` : section Enregistreur (Enregistrer/Arreter, durée live via `getCurrentDuration()`, métronome activable pendant la prise). Recorder = pur JS (natif déjà dans le dev client) -> pas de rebuild.
+- typecheck OK, bundle rechargé sans crash.
+- A VERIFIER A L'OREILLE : accord permission micro au 1er enregistrement, prise audible relisible depuis le Lecteur, durée correcte.
+- Lot 1 quasi bouclé. Reste à confirmer le recorder, puis basculer Lot 1 -> Terminé et démarrer Lot 2 (monitoring faible latence, mixage multipiste, looper synchronisé sur getClock(), premiers effets biquad).
+
+### 2026-06-17 — Session 3 (suite 2) : crashs RNTP New Arch + moteur/horloge/métronome
+
+- Lecteur validé utilisateur (lecture OK). Deux crashs RNTP/New Arch corrigés en cours de route, tous deux dans `patches/react-native-track-player+4.1.2.patch` (voir DA-003b) : (1) chargement module TurboModule (`.let {}` x37), (2) `MusicService.emit` via `ReactHost` au lieu de `reactNativeHost`.
+- Moteur temps réel démarré (Lot 1) :
+  - `src/audio/engine/AudioEngine.ts` : AudioContext réel (react-native-audio-api 0.12.2), horloge `getClock()` (currentTime->frame), tempo sur le moteur (source de vérité), singleton `getAudioEngine()`. NB : buffer size pas encore réglable côté JS (lib 0.12.2 n'expose que sampleRate) ; champ conservé.
+  - `src/audio/metronome/Metronome.ts` : scheduler anticipé (lookahead 25 ms, schedule-ahead 100 ms), clic oscillateur+enveloppe calé sample-accurate, temps fort accentué (1500 Hz vs 1000 Hz). Lit le tempo du moteur à chaque temps -> changement de BPM à chaud OK.
+  - `src/ui/EngineeringScreen.tsx` : BPM +/- (40-240) + Demarrer/Arreter ; câblé depuis HomeScreen (route Engineering).
+- react-native-audio-api était déjà dans le dev client -> métronome = pur JS, pas de rebuild. typecheck OK, bundle rechargé, lib native chargée, aucun crash.
+- A VERIFIER A L'OREILLE : clic audible, justesse du tempo, accent du temps fort, stabilité au changement de BPM pendant lecture.
+- Prochaine étape Lot 1 : enregistreur micro (capture PCM/WAV) calé sur getClock(), avec option métronome pendant l'enregistrement. Puis fin Lot 1.
+
+### 2026-06-17 — Session 3 (suite) : audit + slice lecteur Lot 1
+
+- Audit sécurité (OWASP) sur le code réel : 0 critique/haute, 1 medium uuid (build-time, accepté), L1 corrigé (`.gitignore` -> `.env*`). LLM01-10 et catégories serveur non applicables (app hors-ligne mono-utilisateur).
+- Réglages mémoire Gradle pérennisés dans `~/.gradle/gradle.properties` (cf. section Environnement). Choix motivé : expo-build-properties ne couvre pas jvmargs/parallel/workers.
+- Navigation : React Navigation native-stack (choix utilisateur), moins disruptif que expo-router vu l'entrée custom (index.ts + PlaybackService). Deps via `expo install` : @react-navigation/native@7, native-stack, react-native-screens 4.25.2, safe-area-context ~5.7.
+- Slice vertical LECTEUR implémenté (Lot 1) :
+  - `src/storage/` : table `library_files`, modèle `LibraryFile`, `libraryRepository.ts` (requêtes paramétrées).
+  - `src/library/LibraryManager.ts` : import via expo-document-picker + copie sandbox via nouvelle API expo-file-system (File/Paths), persistance DB. Refactor classe -> fonctions de module.
+  - `src/player/LibraryPlayer.ts` : setup TrackPlayer idempotent, capabilities notif, setQueue/play/pause/skip. Fonctions de module.
+  - `src/ui/` : App.tsx (NavigationContainer + init DB puis player), HomeScreen (navigation), PlayerScreen (liste, import, transport via hooks usePlaybackState/useActiveTrack).
+- typecheck OK. Rebuild dev client BUILD SUCCESSFUL 4m39s (machine stable, ~1.7 Go libre min). App lancée sur S21, PID vivant, aucun crash/FATAL/erreur JS.
+- A VERIFIER MANUELLEMENT par l'utilisateur : import réel d'un fichier audio (picker), lecture/pause/skip audible, persistance après redémarrage app, notification média en arrière-plan.
+- Prochaine étape Lot 1 : enregistreur simple + métronome (après horloge moteur). Métadonnées réelles (durée/artiste) non encore extraites à l'import (title=filename pour l'instant).
+
+### 2026-06-17 — Session 3 : premier development build sur S21
+
+- Diagnostic du gel machine de la veille (logs journalctl) : pas un bug logiciel mais un gel système par saturation du swap pendant le build Gradle sur 8 Go de RAM. Signature : `kwin main thread hanging`, `system is too slow`, cold boot sans shutdown propre. Aucun OOM-killer (gel dur avant action noyau).
+- Réglages mémoire appliqués dans `android/gradle.properties` : `parallel=false`, `workers.max=2`, heap 1536m, daemon Kotlin 1024m, `reactNativeArchitectures=arm64-v8a` seul.
+- S21 d'abord vu en MTP seul (debug USB inactif) ; après activation des options développeur + autorisation RSA → `adb devices` OK (RZCW709MFVX).
+- `npx expo run:android` : BUILD SUCCESSFUL en 3m11s, APK installé, app lancée (com.audiostudio.app, PID actif), bundle JS OK (750 modules). Machine stable, aucun gel.
+- Prochaine étape : implémenter le Lot 1 (AudioContext natif, TrackPlayer setup, LibraryManager, HomeScreen navigation) ; pérenniser les réglages Gradle via expo-build-properties.
 
 ### 2026-06-16 — Session 2 : audit sécurité et préparation migration Parrot
 

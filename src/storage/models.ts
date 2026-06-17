@@ -21,3 +21,15 @@ export interface Setting {
   key: string;
   value: string;
 }
+
+// Fichier importé dans la bibliothèque de lecture (distinct des pistes de projet).
+export interface LibraryFile {
+  id: string;
+  uri: string;
+  filename: string;
+  sizeBytes: number;
+  title: string | null;
+  artist: string | null;
+  durationMs: number | null;
+  importedAt: number;
+}

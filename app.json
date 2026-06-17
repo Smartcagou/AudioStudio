@@ -34,8 +34,7 @@
     "plugins": [
       "expo-dev-client",
       "expo-sqlite",
-      "react-native-audio-api",
-      "react-native-track-player"
+      "react-native-audio-api"
     ]
   }
 }

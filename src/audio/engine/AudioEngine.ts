@@ -1,3 +1,5 @@
+import { AudioContext } from 'react-native-audio-api';
+
 import { DEFAULT_ENGINE_CONFIG, EngineConfig, TransportClock } from './types';
 
 // Moteur audio temps réel — cœur du mixage, du looper et des effets.
@@ -5,26 +7,53 @@ import { DEFAULT_ENGINE_CONFIG, EngineConfig, TransportClock } from './types';
 // Strictement distinct de LibraryPlayer (src/player/).
 export class AudioEngine {
   private config: EngineConfig;
-  private running = false;
+  private context: AudioContext | null = null;
+  private bpm = 120;
 
   constructor(config: EngineConfig = DEFAULT_ENGINE_CONFIG) {
     this.config = config;
   }
 
   async start(): Promise<void> {
-    // TODO Lot 1 : créer l'AudioContext natif, configurer sampleRate et bufferSize,
-    // démarrer l'horloge de transport.
-    this.running = true;
+    if (this.context) return;
+    this.context = new AudioContext({ sampleRate: this.config.sampleRate });
+    if (this.context.state !== 'running') {
+      await this.context.resume();
+    }
   }
 
   async stop(): Promise<void> {
-    // TODO : fermer le graphe et libérer les ressources natives.
-    this.running = false;
+    if (!this.context) return;
+    await this.context.close();
+    this.context = null;
+  }
+
+  isRunning(): boolean {
+    return this.context?.state === 'running';
+  }
+
+  // Le contexte natif est partagé par tous les consommateurs (métronome, looper,
+  // mixer). Ils planifient leurs événements sur la même horloge.
+  getContext(): AudioContext {
+    if (!this.context) {
+      throw new Error('AudioEngine not started. Call start() first.');
+    }
+    return this.context;
   }
 
   setBufferSize(bufferSize: EngineConfig['bufferSize']): void {
+    // La version 0.12.2 de react-native-audio-api n'expose pas encore le réglage
+    // de buffer côté JS. On conserve la valeur de config pour le jour où ce sera
+    // branché ; le réglage doit rester ajustable (contrainte de latence).
     this.config = { ...this.config, bufferSize };
-    // TODO : reconfigurer le graphe sans interrompre la lecture si possible.
+  }
+
+  setTempo(bpm: number): void {
+    this.bpm = bpm;
+  }
+
+  getTempo(): number {
+    return this.bpm;
   }
 
   getConfig(): EngineConfig {
@@ -33,12 +62,23 @@ export class AudioEngine {
 
   // Source de vérité unique pour le temps. Looper et pistes lisent ici.
   getClock(): TransportClock {
-    // TODO Lot 1 : exposer la position réelle lue depuis le thread audio.
+    const sampleRate = this.context?.sampleRate ?? this.config.sampleRate;
+    const currentTime = this.context?.currentTime ?? 0;
     return {
-      frame: 0,
-      sampleRate: this.config.sampleRate,
-      bpm: 120,
-      isRunning: this.running,
+      frame: Math.round(currentTime * sampleRate),
+      sampleRate,
+      bpm: this.bpm,
+      isRunning: this.isRunning(),
     };
   }
+}
+
+let instance: AudioEngine | null = null;
+
+// Instance unique du moteur temps réel pour toute l'application.
+export function getAudioEngine(): AudioEngine {
+  if (!instance) {
+    instance = new AudioEngine();
+  }
+  return instance;
 }

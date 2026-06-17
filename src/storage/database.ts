@@ -22,6 +22,17 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS library_files (
+  id TEXT PRIMARY KEY NOT NULL,
+  uri TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  sizeBytes INTEGER NOT NULL DEFAULT 0,
+  title TEXT,
+  artist TEXT,
+  durationMs INTEGER,
+  importedAt INTEGER NOT NULL
+);
 `;
 
 let db: SQLite.SQLiteDatabase | null = null;

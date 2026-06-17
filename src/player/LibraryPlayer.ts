@@ -2,43 +2,68 @@
 // Décodage multi-formats, file de lecture, lecture en arrière-plan, métadonnées.
 // IMPORTANT : strictement distinct du moteur audio temps réel (src/audio/engine/).
 
-export interface LibraryTrack {
-  id: string;
-  uri: string;
-  title: string;
-  artist?: string;
-  durationMs?: number;
+import TrackPlayer, {
+  Capability,
+  Track,
+} from 'react-native-track-player';
+
+import { LibraryFile } from '../storage/models';
+
+let isSetup = false;
+
+function toTrack(file: LibraryFile): Track {
+  return {
+    id: file.id,
+    url: file.uri,
+    title: file.title ?? file.filename,
+    artist: file.artist ?? undefined,
+    duration: file.durationMs != null ? file.durationMs / 1000 : undefined,
+  };
 }
 
-export class LibraryPlayer {
-  private queue: LibraryTrack[] = [];
-
-  async setup(): Promise<void> {
-    // TODO Lot 1 : TrackPlayer.setupPlayer() et enregistrement du service de fond.
+// Initialise le moteur une seule fois. setupPlayer lève une erreur s'il est
+// déjà initialisé (par ex. après un rechargement JS) : on l'absorbe.
+export async function setupLibraryPlayer(): Promise<void> {
+  if (isSetup) return;
+  try {
+    await TrackPlayer.setupPlayer();
+  } catch {
+    // Déjà initialisé côté natif : rien à faire.
   }
+  await TrackPlayer.updateOptions({
+    capabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.Stop,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+    ],
+    compactCapabilities: [Capability.Play, Capability.Pause],
+  });
+  isSetup = true;
+}
 
-  async setQueue(tracks: LibraryTrack[]): Promise<void> {
-    this.queue = tracks;
-    // TODO Lot 1 : TrackPlayer.setQueue() avec mapping vers le format attendu.
-  }
+export async function loadQueue(files: LibraryFile[]): Promise<void> {
+  await TrackPlayer.setQueue(files.map(toTrack));
+}
 
-  async play(): Promise<void> {
-    // TODO : TrackPlayer.play()
-  }
+export async function playFileAt(index: number): Promise<void> {
+  await TrackPlayer.skip(index);
+  await TrackPlayer.play();
+}
 
-  async pause(): Promise<void> {
-    // TODO : TrackPlayer.pause()
-  }
+export async function play(): Promise<void> {
+  await TrackPlayer.play();
+}
 
-  async skipToNext(): Promise<void> {
-    // TODO : TrackPlayer.skipToNext()
-  }
+export async function pause(): Promise<void> {
+  await TrackPlayer.pause();
+}
 
-  async skipToPrevious(): Promise<void> {
-    // TODO : TrackPlayer.skipToPrevious()
-  }
+export async function skipToNext(): Promise<void> {
+  await TrackPlayer.skipToNext();
+}
 
-  getQueue(): readonly LibraryTrack[] {
-    return this.queue;
-  }
+export async function skipToPrevious(): Promise<void> {
+  await TrackPlayer.skipToPrevious();
 }
