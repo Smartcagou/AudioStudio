@@ -29,9 +29,16 @@ export function EngineeringScreen({ navigation }: Props) {
   const [bpm, setBpm] = useState(120);
   const [running, setRunning] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [monitoring, setMonitoring] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function toggleMonitoring() {
+    const next = !monitoring;
+    recorder.setMonitoring(next);
+    setMonitoring(next);
+  }
 
   // Le tempo vit sur le moteur (horloge partagée) : le métronome le relit à chaque
   // temps, donc un changement de BPM pendant la lecture est pris en compte.
@@ -154,6 +161,23 @@ export function EngineeringScreen({ navigation }: Props) {
         </Text>
       )}
 
+      <View style={styles.monitorRow}>
+        <Text style={styles.controlLabel}>Monitoring</Text>
+        <TouchableOpacity
+          style={[styles.monitorToggle, monitoring && styles.monitorToggleActive]}
+          onPress={toggleMonitoring}
+          disabled={recording}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.monitorText, monitoring && styles.monitorTextActive]}>
+            {monitoring ? 'Active' : 'Inactif'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {monitoring && !recording ? (
+        <Text style={styles.warning}>Au casque uniquement (risque de larsen sur haut-parleur).</Text>
+      ) : null}
+
       <TouchableOpacity
         style={[styles.toggle, recording && styles.toggleRecording]}
         onPress={toggleRecording}
@@ -271,6 +295,41 @@ const styles = StyleSheet.create({
     color: '#888888',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  monitorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  controlLabel: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  monitorToggle: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#ffffff',
+  },
+  monitorToggleActive: {
+    backgroundColor: '#111111',
+    borderColor: '#111111',
+  },
+  monitorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  monitorTextActive: {
+    color: '#ffffff',
+  },
+  warning: {
+    fontSize: 12,
+    color: '#b00020',
+    marginBottom: 16,
   },
   toggleText: {
     fontSize: 17,

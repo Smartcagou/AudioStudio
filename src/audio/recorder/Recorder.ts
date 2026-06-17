@@ -3,6 +3,8 @@ import {
   AudioRecorder,
   FileDirectory,
   FileFormat,
+  GainNode,
+  RecorderAdapterNode,
 } from 'react-native-audio-api';
 
 import { AudioEngine } from '../engine/AudioEngine';
@@ -25,8 +27,23 @@ export class Recorder {
   private recorder: AudioRecorder | null = null;
   private startFrame = 0;
 
+  // Monitoring d'entrée : route le micro vers la sortie pendant la prise.
+  // Armé avant l'enregistrement (comportement type DAW). À utiliser au casque,
+  // sinon le retour haut-parleur provoque un larsen.
+  private monitoring = false;
+  private adapter: RecorderAdapterNode | null = null;
+  private monitorGain: GainNode | null = null;
+
   constructor(engine: AudioEngine) {
     this.engine = engine;
+  }
+
+  setMonitoring(enabled: boolean): void {
+    this.monitoring = enabled;
+  }
+
+  isMonitoringEnabled(): boolean {
+    return this.monitoring;
   }
 
   // Demande la permission micro si nécessaire. Retourne true si accordée.
@@ -68,12 +85,37 @@ export class Recorder {
       throw new Error(enabled.message);
     }
 
+    // Câble le retour direct micro -> sortie avant de démarrer la capture.
+    if (this.monitoring) {
+      const context = this.engine.getContext();
+      const adapter = context.createRecorderAdapter();
+      const monitorGain = context.createGain();
+      monitorGain.gain.value = 1;
+      recorder.connect(adapter);
+      adapter.connect(monitorGain);
+      monitorGain.connect(context.destination);
+      this.adapter = adapter;
+      this.monitorGain = monitorGain;
+    }
+
     const started = recorder.start();
     if (started.status === 'error') {
+      this.teardownMonitoring(recorder);
       throw new Error(started.message);
     }
 
     this.recorder = recorder;
+  }
+
+  private teardownMonitoring(recorder: AudioRecorder): void {
+    if (this.adapter) {
+      recorder.disconnect();
+      this.adapter = null;
+    }
+    if (this.monitorGain) {
+      this.monitorGain.disconnect();
+      this.monitorGain = null;
+    }
   }
 
   stop(): RecordingResult {
@@ -83,6 +125,7 @@ export class Recorder {
     }
 
     const result = recorder.stop();
+    this.teardownMonitoring(recorder);
     this.recorder = null;
 
     if (result.status === 'error') {

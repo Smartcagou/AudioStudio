@@ -125,7 +125,10 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
   - `src/ui/MixerScreen.tsx` : charge toute la bibliothèque en pistes, gain +/-3 dB, pan G/C/D, mute, Tout lire/Arreter. Accès via bouton sur EngineeringScreen (route Mixer).
 - typecheck OK, pur JS (pas de rebuild), bundle rechargé sans crash. Décodage seulement à l'ouverture de l'écran Mixer.
 - Mixage multipiste VALIDE UTILISATEUR (lecture simultanée synchronisée, gain/pan/mute OK). `decodeAudioData` accepte donc bien les URI file:// (pas besoin de stripper).
-- Reste Lot 2 : monitoring faible latence, looper synchronisé (overdub) sur getClock(), premiers effets biquad. Commit du mixer à faire (idéalement branche dédiée).
+- Mixer commité + poussé sur branche `lot-2-mixer` (depuis lot-1-socle).
+- Monitoring faible latence implémenté : `Recorder.setMonitoring()` + chemin `RecorderAdapterNode -> gain -> destination` câblé dans `Recorder.start()` (armé avant la prise, type DAW). Toggle Monitoring dans EngineeringScreen avec avertissement larsen (casque obligatoire). NB : taille de buffer/latence pas réglable côté JS en 0.12.2 (seul sampleRate exposé) -> latence = défaut natif. typecheck OK, pur JS, bundle rechargé sans crash.
+- A VERIFIER AU CASQUE : activer Monitoring puis Enregistrer -> on s'entend en direct ; pas de larsen au casque ; la prise reste enregistrée et relisible.
+- Reste Lot 2 : looper synchronisé (overdub) sur getClock(), premiers effets biquad. Monitoring à commiter une fois validé.
 
 ### 2026-06-17 — Session 3 (suite 3) : enregistreur micro (fin Lot 1)
 
