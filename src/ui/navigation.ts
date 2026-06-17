@@ -6,4 +6,5 @@ export type RootStackParamList = {
   Player: undefined;
   Engineering: undefined;
   Mixer: undefined;
+  Looper: undefined;
 };

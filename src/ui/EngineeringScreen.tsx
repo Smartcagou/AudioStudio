@@ -125,6 +125,14 @@ export function EngineeringScreen({ navigation }: Props) {
         <Text style={styles.navButtonText}>Mixage multipiste</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.navButton}
+        onPress={() => navigation.navigate('Looper')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.navButtonText}>Looper</Text>
+      </TouchableOpacity>
+
       <Text style={styles.sectionTitle}>Metronome</Text>
 
       <View style={styles.bpmRow}>

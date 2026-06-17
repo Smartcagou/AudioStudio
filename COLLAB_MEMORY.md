@@ -127,8 +127,14 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
 - Mixage multipiste VALIDE UTILISATEUR (lecture simultanée synchronisée, gain/pan/mute OK). `decodeAudioData` accepte donc bien les URI file:// (pas besoin de stripper).
 - Mixer commité + poussé sur branche `lot-2-mixer` (depuis lot-1-socle).
 - Monitoring faible latence implémenté : `Recorder.setMonitoring()` + chemin `RecorderAdapterNode -> gain -> destination` câblé dans `Recorder.start()` (armé avant la prise, type DAW). Toggle Monitoring dans EngineeringScreen avec avertissement larsen (casque obligatoire). NB : taille de buffer/latence pas réglable côté JS en 0.12.2 (seul sampleRate exposé) -> latence = défaut natif. typecheck OK, pur JS, bundle rechargé sans crash.
-- A VERIFIER AU CASQUE : activer Monitoring puis Enregistrer -> on s'entend en direct ; pas de larsen au casque ; la prise reste enregistrée et relisible.
-- Reste Lot 2 : looper synchronisé (overdub) sur getClock(), premiers effets biquad. Monitoring à commiter une fois validé.
+- Monitoring VALIDE UTILISATEUR. Commité + poussé sur `lot-2-mixer`.
+- Looper synchronisé avec overdub implémenté :
+  - `src/audio/looper/Looper.ts` : longueur de boucle = bars x beatsPerBar x (60/bpm) du moteur (quantification grille). Capture une boucle via AudioRecorder (WAV Cache, prefix loop-) -> decodeAudioData -> AudioBuffer ; chaque couche = AudioBufferSourceNode loop=true, loopEnd=loopDur (période verrouillée, pas de dérive). Ancrage commun T0 ; couches démarrées sur `nextBoundary()` (T0 + k*loopDur). Overdub quantize=true (attend la frontière avant de capturer). undoLastLayer, clear.
+  - `src/ui/LooperScreen.tsx` : choix mesures (1/2/4), Enregistrer la boucle, Overdub, Annuler derniere couche, Effacer. Avertissement casque. Accès via bouton EngineeringScreen (route Looper).
+- LIMITES CONNUES (assumées v1) : le timing de capture (début/durée) repose sur des setTimeout JS (jitter ~10-30 ms) et il y a une latence d'entrée micro non compensée -> léger offset de phase constant possible entre couches. La période est exacte (pas de dérive) mais l'alignement à beat 1 n'est pas sample-accurate. Compensation de latence = amélioration future (idéalement quand la lib exposera le réglage de buffer / un timestamp de capture).
+- typecheck OK, pur JS, bundle rechargé sans crash.
+- A VERIFIER A L'OREILLE (casque) : Enregistrer la boucle -> elle tourne ; Overdub -> la couche se superpose en phase ; Annuler/Effacer OK. Juger l'alignement rythmique.
+- Reste Lot 2 : premiers effets biquad (BiquadFilterNode sur les pistes du mixer). Looper à commiter une fois validé.
 
 ### 2026-06-17 — Session 3 (suite 3) : enregistreur micro (fin Lot 1)
 

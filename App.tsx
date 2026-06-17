@@ -9,6 +9,7 @@ import { HomeScreen } from './src/ui/HomeScreen';
 import { PlayerScreen } from './src/ui/PlayerScreen';
 import { EngineeringScreen } from './src/ui/EngineeringScreen';
 import { MixerScreen } from './src/ui/MixerScreen';
+import { LooperScreen } from './src/ui/LooperScreen';
 import { RootStackParamList } from './src/ui/navigation';
 import { initDatabase } from './src/storage/database';
 import { setupLibraryPlayer } from './src/player/LibraryPlayer';
@@ -70,6 +71,11 @@ export default function App() {
             name="Mixer"
             component={MixerScreen}
             options={{ title: 'Mixage multipiste' }}
+          />
+          <Stack.Screen
+            name="Looper"
+            component={LooperScreen}
+            options={{ title: 'Looper' }}
           />
         </Stack.Navigator>
       </NavigationContainer>
