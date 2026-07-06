@@ -15,6 +15,8 @@ export const palette = {
   textPrimary: '#f2f2f5',
   textSecondary: '#8a8a93',
   textOnAccent: '#ffffff',
+  danger: '#e5484d',
+  border: '#33333b',
   shadowLight: '#33333b',
   shadowDark: '#101013',
 };

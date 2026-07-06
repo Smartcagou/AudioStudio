@@ -2,8 +2,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+import { palette } from './src/ui/theme';
 
 import { HomeScreen } from './src/ui/HomeScreen';
 import { PlayerScreen } from './src/ui/PlayerScreen';
@@ -16,6 +18,20 @@ import { initDatabase } from './src/storage/database';
 import { setupLibraryPlayer } from './src/player/LibraryPlayer';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Thème sombre appliqué à toute la navigation (charte graphique de l'app).
+const navTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: palette.background,
+    card: palette.surface,
+    text: palette.textPrimary,
+    border: palette.border,
+    primary: palette.accent,
+    notification: palette.accent,
+  },
+};
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -44,15 +60,22 @@ export default function App() {
   if (!ready) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={palette.accent} />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator>
+      <NavigationContainer theme={navTheme}>
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: palette.surface },
+            headerTintColor: palette.textPrimary,
+            headerShadowVisible: false,
+            contentStyle: { backgroundColor: palette.background },
+          }}
+        >
           <Stack.Screen
             name="Home"
             component={HomeScreen}
@@ -85,7 +108,7 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
     </SafeAreaProvider>
   );
 }
@@ -95,10 +118,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: palette.background,
   },
   errorText: {
-    color: '#b00020',
+    color: palette.danger,
     fontSize: 15,
     paddingHorizontal: 24,
     textAlign: 'center',

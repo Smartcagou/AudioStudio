@@ -14,6 +14,7 @@ import { Mixer } from '../audio/mixer/Mixer';
 import { TrackFilterType, TrackInfo } from '../audio/mixer/Track';
 import { ExportFormat, exportMix, exportTrack } from '../audio/export/Exporter';
 import { addExportToLibrary, listFiles } from '../library/LibraryManager';
+import { palette, raisedBorders } from './theme';
 
 export function MixerScreen() {
   const mixerRef = useRef<Mixer | null>(null);
@@ -155,7 +156,7 @@ export function MixerScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={palette.accent} />
       </View>
     );
   }
@@ -305,29 +306,28 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: palette.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: palette.background,
   },
   listContent: {
     padding: 16,
   },
   empty: {
-    color: '#666666',
+    color: palette.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     marginTop: 32,
     paddingHorizontal: 24,
   },
   track: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 16,
+    padding: 14,
     marginBottom: 12,
-    backgroundColor: '#fafafa',
+    backgroundColor: palette.surface,
+    ...raisedBorders,
   },
   trackHeader: {
     flexDirection: 'row',
@@ -339,26 +339,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#111111',
+    color: palette.textPrimary,
     marginRight: 12,
   },
   muteButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    backgroundColor: palette.surfaceRaised,
   },
   muteButtonActive: {
-    backgroundColor: '#b00020',
-    borderColor: '#b00020',
+    backgroundColor: palette.danger,
   },
   muteText: {
     fontSize: 13,
-    color: '#333333',
+    color: palette.textPrimary,
   },
   muteTextActive: {
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   controlRow: {
     flexDirection: 'row',
@@ -368,74 +366,70 @@ const styles = StyleSheet.create({
   controlLabel: {
     width: 44,
     fontSize: 13,
-    color: '#666666',
+    color: palette.textSecondary,
   },
   controlValue: {
     width: 64,
     textAlign: 'center',
     fontSize: 14,
-    color: '#111111',
+    color: palette.textPrimary,
   },
   smallButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    backgroundColor: palette.surfaceRaised,
   },
   smallButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333333',
+    color: palette.textPrimary,
   },
   panButton: {
     flex: 1,
     marginHorizontal: 4,
     paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    backgroundColor: palette.surfaceRaised,
     alignItems: 'center',
   },
   panButtonActive: {
-    backgroundColor: '#111111',
-    borderColor: '#111111',
+    backgroundColor: palette.accent,
   },
   panText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333333',
+    color: palette.textPrimary,
   },
   panTextActive: {
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   transport: {
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: palette.border,
     padding: 16,
   },
   playButton: {
     paddingVertical: 18,
-    borderRadius: 8,
-    backgroundColor: '#111111',
+    borderRadius: 14,
+    backgroundColor: palette.accent,
     alignItems: 'center',
+    elevation: 4,
   },
   playButtonActive: {
-    backgroundColor: '#b00020',
+    backgroundColor: palette.danger,
   },
   playButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   exportButton: {
     marginTop: 12,
     paddingVertical: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#111111',
+    borderRadius: 14,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
     alignItems: 'center',
   },
   exportButtonDisabled: {
@@ -444,6 +438,6 @@ const styles = StyleSheet.create({
   exportButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#111111',
+    color: palette.textPrimary,
   },
 });

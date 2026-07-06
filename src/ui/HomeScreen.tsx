@@ -2,6 +2,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from './navigation';
+import { palette, raisedBorders } from './theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -45,26 +46,26 @@ function ModuleButton({ label, description, onPress }: ModuleButtonProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: palette.background,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
   module: {
     marginBottom: 16,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
+    elevation: 3,
   },
   moduleTitle: {
     fontSize: 17,
     fontWeight: '600',
     marginBottom: 4,
-    color: '#111111',
+    color: palette.textPrimary,
   },
   moduleText: {
     fontSize: 13,
-    color: '#666666',
+    color: palette.textSecondary,
   },
 });

@@ -7,6 +7,7 @@ import { Metronome } from '../audio/metronome/Metronome';
 import { Recorder } from '../audio/recorder/Recorder';
 import { addRecordingToLibrary } from '../library/LibraryManager';
 import { RootStackParamList } from './navigation';
+import { palette, raisedBorders } from './theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Engineering'>;
 
@@ -215,27 +216,30 @@ function AdjustButton({ label, onPress }: AdjustButtonProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: palette.background,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
   navButton: {
     paddingVertical: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#111111',
+    borderRadius: 14,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
+    elevation: 3,
   },
   navButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#111111',
+    color: palette.textPrimary,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#666666',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: palette.textSecondary,
+    marginTop: 16,
     marginBottom: 24,
   },
   bpmRow: {
@@ -247,11 +251,11 @@ const styles = StyleSheet.create({
   bpmValue: {
     fontSize: 72,
     fontWeight: '700',
-    color: '#111111',
+    color: palette.textPrimary,
   },
   bpmUnit: {
     fontSize: 18,
-    color: '#666666',
+    color: palette.textSecondary,
     marginLeft: 8,
   },
   adjustRow: {
@@ -263,44 +267,44 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
     paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
     alignItems: 'center',
   },
   adjustButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
+    color: palette.textPrimary,
   },
   toggle: {
     paddingVertical: 18,
-    borderRadius: 8,
-    backgroundColor: '#111111',
+    borderRadius: 14,
+    backgroundColor: palette.accent,
     alignItems: 'center',
+    elevation: 4,
   },
   toggleActive: {
-    backgroundColor: '#b00020',
+    backgroundColor: palette.danger,
   },
   toggleRecording: {
-    backgroundColor: '#b00020',
+    backgroundColor: palette.danger,
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: palette.border,
     marginVertical: 32,
   },
   elapsed: {
     fontSize: 40,
     fontWeight: '700',
-    color: '#b00020',
+    color: palette.danger,
     textAlign: 'center',
     marginBottom: 24,
   },
   hint: {
     fontSize: 13,
-    color: '#888888',
+    color: palette.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -312,39 +316,38 @@ const styles = StyleSheet.create({
   },
   controlLabel: {
     fontSize: 14,
-    color: '#666666',
+    color: palette.textSecondary,
   },
   monitorToggle: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
   },
   monitorToggleActive: {
-    backgroundColor: '#111111',
-    borderColor: '#111111',
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
   },
   monitorText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333333',
+    color: palette.textPrimary,
   },
   monitorTextActive: {
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   warning: {
     fontSize: 12,
-    color: '#b00020',
+    color: palette.danger,
     marginBottom: 16,
   },
   toggleText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   toggleTextActive: {
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
 });

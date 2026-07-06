@@ -118,6 +118,14 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
 
 ## Journal de session
 
+### 2026-07-06 — Session 4 (suite 2) : charte sombre app-wide + APK release autonome
+
+- Charte graphique sombre neumorphique étendue à TOUTE l'app (demande utilisateur) : `src/ui/theme.ts` (ajout tokens `danger`/`border`), restyle Home/Engineering/Looper/Mixer sur la palette, thème de navigation sombre global dans `App.tsx` (`navTheme` basé sur DarkTheme + `screenOptions` header sombre), StatusBar `light`, ActivityIndicator en accent. **L'exception icônes est désormais de facto app-wide** (mais les écrans de contrôle gardent des libellés texte, plus clairs).
+- **APK release autonome produit et validé** : `./android/gradlew -p android assembleRelease`. 1er build = 14 min (recompile C++ natif Release, phase lourde mais AUCUN gel : swap stable ~1,8-2,3 Gi, minify OFF par défaut, arm64-v8a seul). Rebuild après le restyle JS = **1 min** (natif en cache). APK = `android/app/build/outputs/apk/release/app-release.apk` (~45,8 Mo), signé keystore debug -> installable directement, copié en `~/audiostudio-feedback.apk`.
+- **Hors-ligne prouvé** : APK contient `assets/index.android.bundle` (JS embarqué) + `classes.dex` ; tourne sans Metro, testé sur S21 EN MODE AVION, aucun crash, aucune tentative de dev server. `expo-dev-launcher`/`dev-menu` compilés mais inertes en release.
+- RAPPEL distinction : l'APK **development** (dev client) N'EST PAS partageable (charge le JS depuis Metro/PC) ; seul l'APK **release** est autonome. Profil EAS `preview` (eas.json) = alternative cloud si gels reviennent.
+- typecheck OK. A committer + pousser. APK `~/audiostudio-feedback.apk` prêt à envoyer au client pour feedback.
+
 ### 2026-07-06 — Session 4 (suite) : refonte UI lecteur (design sombre neumorphique)
 
 - Demande utilisateur : implémenter un design fourni (mockup) AVANT de finir Lot 3 — lecteur sombre neumorphique, art circulaire, scrubber dégradé orange, transport type DAW + écran playlist.

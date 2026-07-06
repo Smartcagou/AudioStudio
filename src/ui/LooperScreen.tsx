@@ -3,6 +3,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Looper, LooperState } from '../audio/looper/Looper';
+import { palette, raisedBorders } from './theme';
 
 const BAR_CHOICES = [1, 2, 4];
 
@@ -145,33 +146,33 @@ export function LooperScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: palette.background,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
   warning: {
     fontSize: 12,
-    color: '#b00020',
+    color: palette.danger,
     textAlign: 'center',
     marginBottom: 20,
   },
   statusBox: {
     alignItems: 'center',
     paddingVertical: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
+    borderRadius: 16,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
     marginBottom: 28,
+    elevation: 3,
   },
   statusLabel: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111111',
+    color: palette.textPrimary,
   },
   statusMeta: {
     fontSize: 14,
-    color: '#666666',
+    color: palette.textSecondary,
     marginTop: 6,
   },
   barsRow: {
@@ -181,47 +182,46 @@ const styles = StyleSheet.create({
   },
   barsLabel: {
     fontSize: 14,
-    color: '#666666',
+    color: palette.textSecondary,
     marginRight: 16,
   },
   barButton: {
     width: 48,
     paddingVertical: 12,
     marginHorizontal: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
+    borderRadius: 12,
+    backgroundColor: palette.surface,
+    ...raisedBorders,
     alignItems: 'center',
   },
   barButtonActive: {
-    backgroundColor: '#111111',
-    borderColor: '#111111',
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
   },
   barText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
+    color: palette.textPrimary,
   },
   barTextActive: {
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   action: {
     paddingVertical: 18,
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: 'center',
     marginBottom: 12,
   },
   actionPrimary: {
-    backgroundColor: '#111111',
+    backgroundColor: palette.accent,
+    elevation: 4,
   },
   actionSecondary: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    backgroundColor: palette.surface,
+    ...raisedBorders,
   },
   actionDanger: {
-    backgroundColor: '#b00020',
+    backgroundColor: palette.danger,
   },
   actionDisabled: {
     opacity: 0.5,
@@ -229,11 +229,11 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: palette.textOnAccent,
   },
   actionSecondaryText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
+    color: palette.textPrimary,
   },
 });
