@@ -1,4 +1,4 @@
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from './navigation';
@@ -15,14 +15,9 @@ export function HomeScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('Player')}
       />
       <ModuleButton
-        label="Ingenierie sonore"
-        description="Metronome, enregistreur, mixage, looper, effets temps reel"
-        onPress={() => navigation.navigate('Engineering')}
-      />
-      <ModuleButton
-        label="Export"
-        description="Rendu et encodage multi-formats"
-        onPress={() => Alert.alert('Export', 'Disponible dans un prochain lot.')}
+        label="Projets"
+        description="Organiser vos sons et les travailler : mixage, looper, enregistreur, effets"
+        onPress={() => navigation.navigate('Projects')}
       />
     </View>
   );

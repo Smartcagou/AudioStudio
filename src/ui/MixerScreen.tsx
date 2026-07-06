@@ -8,15 +8,24 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Mixer } from '../audio/mixer/Mixer';
 import { TrackFilterType, TrackInfo } from '../audio/mixer/Track';
 import { ExportFormat, exportMix, exportTrack } from '../audio/export/Exporter';
-import { addExportToLibrary, listFiles } from '../library/LibraryManager';
+import { addExportToLibrary } from '../library/LibraryManager';
+import { listProjectTracks, persistTrackMix } from '../library/ProjectManager';
+import { RootStackParamList } from './navigation';
 import { palette, raisedBorders } from './theme';
 
-export function MixerScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'Mixer'>;
+
+export function MixerScreen({ route }: Props) {
+  const { projectId } = route.params;
+  const insets = useSafeAreaInsets();
   const mixerRef = useRef<Mixer | null>(null);
   if (mixerRef.current === null) {
     mixerRef.current = new Mixer(getAudioEngine());
@@ -36,19 +45,19 @@ export function MixerScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const files = await listFiles();
-      for (const file of files) {
+      const projectTracks = await listProjectTracks(projectId);
+      for (const track of projectTracks) {
         try {
           await mixer.addTrack({
-            id: file.id,
-            name: file.title ?? file.filename,
-            uri: file.uri,
-            gainDb: 0,
-            pan: 0,
+            id: track.id,
+            name: track.name,
+            uri: track.filePath,
+            gainDb: track.gainDb,
+            pan: track.pan,
             muted: false,
           });
         } catch (err) {
-          console.error('[MixerScreen] track load failed:', file.filename, err);
+          console.error('[MixerScreen] track load failed:', track.name, err);
         }
       }
       if (!cancelled) {
@@ -61,7 +70,7 @@ export function MixerScreen() {
       cancelled = true;
       mixer.clear();
     };
-  }, [mixer, refresh]);
+  }, [mixer, refresh, projectId]);
 
   function findTrack(id: string) {
     return mixer.getTracks().find((t) => t.id === id) ?? null;
@@ -71,11 +80,17 @@ export function MixerScreen() {
     const track = findTrack(id);
     if (!track) return;
     track.setGainDb(Math.min(12, Math.max(-60, track.getInfo().gainDb + delta)));
+    const info = track.getInfo();
+    void persistTrackMix(id, info.gainDb, info.pan);
     refresh();
   }
 
   function setPan(id: string, pan: number) {
-    findTrack(id)?.setPan(pan);
+    const track = findTrack(id);
+    if (!track) return;
+    track.setPan(pan);
+    const info = track.getInfo();
+    void persistTrackMix(id, info.gainDb, info.pan);
     refresh();
   }
 
@@ -161,12 +176,14 @@ export function MixerScreen() {
     );
   }
 
+  const disabled = tracks.length === 0;
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.listContent}>
         {tracks.length === 0 ? (
           <Text style={styles.empty}>
-            Aucune piste. Importez ou enregistrez de l audio, puis revenez ici.
+            Aucune piste dans ce projet. Importez des sons ou enregistrez une prise.
           </Text>
         ) : (
           tracks.map((track) => (
@@ -176,43 +193,45 @@ export function MixerScreen() {
                   {track.name}
                 </Text>
                 <TouchableOpacity
-                  style={[styles.muteButton, track.muted && styles.muteButtonActive]}
+                  style={[styles.iconToggle, track.muted && styles.iconToggleActive]}
                   onPress={() => toggleMute(track.id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.muteText, track.muted && styles.muteTextActive]}>
-                    {track.muted ? 'Muet' : 'Actif'}
-                  </Text>
+                  <Ionicons
+                    name={track.muted ? 'volume-mute' : 'volume-high'}
+                    size={20}
+                    color={track.muted ? palette.textOnAccent : palette.textPrimary}
+                  />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.controlRow}>
                 <Text style={styles.controlLabel}>Gain</Text>
-                <SmallButton label="-3" onPress={() => changeGain(track.id, -3)} />
+                <IconStep name="remove" onPress={() => changeGain(track.id, -3)} />
                 <Text style={styles.controlValue}>{track.gainDb} dB</Text>
-                <SmallButton label="+3" onPress={() => changeGain(track.id, 3)} />
+                <IconStep name="add" onPress={() => changeGain(track.id, 3)} />
               </View>
 
               <View style={styles.controlRow}>
                 <Text style={styles.controlLabel}>Pan</Text>
-                <PanButton label="G" active={track.pan < 0} onPress={() => setPan(track.id, -1)} />
-                <PanButton label="C" active={track.pan === 0} onPress={() => setPan(track.id, 0)} />
-                <PanButton label="D" active={track.pan > 0} onPress={() => setPan(track.id, 1)} />
+                <Segment label="G" active={track.pan < 0} onPress={() => setPan(track.id, -1)} />
+                <Segment label="C" active={track.pan === 0} onPress={() => setPan(track.id, 0)} />
+                <Segment label="D" active={track.pan > 0} onPress={() => setPan(track.id, 1)} />
               </View>
 
               <View style={styles.controlRow}>
                 <Text style={styles.controlLabel}>Filtre</Text>
-                <PanButton
+                <Segment
                   label="Aucun"
                   active={!track.filterEnabled}
                   onPress={() => setFilter(track.id, 'none')}
                 />
-                <PanButton
+                <Segment
                   label="Pass-bas"
                   active={track.filterEnabled && track.filterType === 'lowpass'}
                   onPress={() => setFilter(track.id, 'lowpass')}
                 />
-                <PanButton
+                <Segment
                   label="Pass-haut"
                   active={track.filterEnabled && track.filterType === 'highpass'}
                   onPress={() => setFilter(track.id, 'highpass')}
@@ -222,9 +241,9 @@ export function MixerScreen() {
               {track.filterEnabled ? (
                 <View style={styles.controlRow}>
                   <Text style={styles.controlLabel}>Freq</Text>
-                  <SmallButton label="-" onPress={() => scaleFilterFrequency(track.id, 1 / 1.5)} />
+                  <IconStep name="remove" onPress={() => scaleFilterFrequency(track.id, 1 / 1.5)} />
                   <Text style={styles.controlValue}>{track.filterFrequency} Hz</Text>
-                  <SmallButton label="+" onPress={() => scaleFilterFrequency(track.id, 1.5)} />
+                  <IconStep name="add" onPress={() => scaleFilterFrequency(track.id, 1.5)} />
                 </View>
               ) : null}
             </View>
@@ -232,71 +251,77 @@ export function MixerScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.transport}>
+      <View style={[styles.transport, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
         <TouchableOpacity
-          style={[styles.playButton, playing && styles.playButtonActive]}
+          style={[styles.playButton, playing && styles.playButtonActive, disabled && styles.buttonDisabled]}
           onPress={togglePlay}
-          activeOpacity={0.7}
-          disabled={tracks.length === 0}
+          activeOpacity={0.8}
+          disabled={disabled}
         >
+          <Ionicons name={playing ? 'stop' : 'play'} size={22} color={palette.textOnAccent} />
           <Text style={styles.playButtonText}>{playing ? 'Arreter' : 'Tout lire'}</Text>
         </TouchableOpacity>
 
-        <View style={styles.controlRow}>
+        <View style={styles.formatRow}>
           <Text style={styles.controlLabel}>Format</Text>
-          <PanButton label="WAV" active={format === 'wav'} onPress={() => setFormat('wav')} />
-          <PanButton label="M4A" active={format === 'm4a'} onPress={() => setFormat('m4a')} />
+          <Segment label="WAV" active={format === 'wav'} onPress={() => setFormat('wav')} />
+          <Segment label="M4A" active={format === 'm4a'} onPress={() => setFormat('m4a')} />
         </View>
 
-        <TouchableOpacity
-          style={[styles.exportButton, (exporting || tracks.length === 0) && styles.exportButtonDisabled]}
-          onPress={onExport}
-          activeOpacity={0.7}
-          disabled={exporting || tracks.length === 0}
-        >
-          <Text style={styles.exportButtonText}>
-            {exporting ? 'Export en cours' : `Exporter le mix (${format.toUpperCase()})`}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.exportRow}>
+          <TouchableOpacity
+            style={[styles.exportButton, (exporting || disabled) && styles.buttonDisabled]}
+            onPress={onExport}
+            activeOpacity={0.7}
+            disabled={exporting || disabled}
+          >
+            <Ionicons name="download-outline" size={18} color={palette.textPrimary} />
+            <Text style={styles.exportButtonText}>Mix ({format.toUpperCase()})</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.exportButton, (exporting || tracks.length === 0) && styles.exportButtonDisabled]}
-          onPress={onExportStems}
-          activeOpacity={0.7}
-          disabled={exporting || tracks.length === 0}
-        >
-          <Text style={styles.exportButtonText}>Exporter les pistes</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.exportButton, (exporting || disabled) && styles.buttonDisabled]}
+            onPress={onExportStems}
+            activeOpacity={0.7}
+            disabled={exporting || disabled}
+          >
+            <Ionicons name="albums-outline" size={18} color={palette.textPrimary} />
+            <Text style={styles.exportButtonText}>Pistes</Text>
+          </TouchableOpacity>
+        </View>
+        {exporting ? <Text style={styles.exportHint}>Export en cours...</Text> : null}
       </View>
     </View>
   );
 }
 
-interface ButtonProps {
-  label: string;
+interface IconStepProps {
+  name: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
 }
 
-function SmallButton({ label, onPress }: ButtonProps) {
+function IconStep({ name, onPress }: IconStepProps) {
   return (
-    <TouchableOpacity style={styles.smallButton} onPress={onPress} activeOpacity={0.7}>
-      <Text style={styles.smallButtonText}>{label}</Text>
+    <TouchableOpacity style={styles.iconStep} onPress={onPress} activeOpacity={0.7}>
+      <Ionicons name={name} size={22} color={palette.textPrimary} />
     </TouchableOpacity>
   );
 }
 
-interface PanButtonProps extends ButtonProps {
+interface SegmentProps {
+  label: string;
   active: boolean;
+  onPress: () => void;
 }
 
-function PanButton({ label, active, onPress }: PanButtonProps) {
+function Segment({ label, active, onPress }: SegmentProps) {
   return (
     <TouchableOpacity
-      style={[styles.panButton, active && styles.panButtonActive]}
+      style={[styles.segment, active && styles.segmentActive]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={[styles.panText, active && styles.panTextActive]}>{label}</Text>
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -342,21 +367,16 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
     marginRight: 12,
   },
-  muteButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  iconToggle: {
+    width: 40,
+    height: 36,
     borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: palette.surfaceRaised,
   },
-  muteButtonActive: {
+  iconToggleActive: {
     backgroundColor: palette.danger,
-  },
-  muteText: {
-    fontSize: 13,
-    color: palette.textPrimary,
-  },
-  muteTextActive: {
-    color: palette.textOnAccent,
   },
   controlRow: {
     flexDirection: 'row',
@@ -369,51 +389,52 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
   },
   controlValue: {
-    width: 64,
+    width: 72,
     textAlign: 'center',
     fontSize: 14,
     color: palette.textPrimary,
   },
-  smallButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  iconStep: {
+    width: 44,
+    height: 40,
     borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: palette.surfaceRaised,
   },
-  smallButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: palette.textPrimary,
-  },
-  panButton: {
+  segment: {
     flex: 1,
     marginHorizontal: 4,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: palette.surfaceRaised,
     alignItems: 'center',
   },
-  panButtonActive: {
+  segmentActive: {
     backgroundColor: palette.accent,
   },
-  panText: {
+  segmentText: {
     fontSize: 14,
     fontWeight: '600',
     color: palette.textPrimary,
   },
-  panTextActive: {
+  segmentTextActive: {
     color: palette.textOnAccent,
   },
   transport: {
     borderTopWidth: 1,
     borderTopColor: palette.border,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    backgroundColor: palette.background,
   },
   playButton: {
-    paddingVertical: 18,
+    flexDirection: 'row',
+    paddingVertical: 16,
     borderRadius: 14,
     backgroundColor: palette.accent,
     alignItems: 'center',
+    justifyContent: 'center',
     elevation: 4,
   },
   playButtonActive: {
@@ -421,23 +442,43 @@ const styles = StyleSheet.create({
   },
   playButtonText: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     color: palette.textOnAccent,
+    marginLeft: 10,
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  formatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 12,
+  },
+  exportRow: {
+    flexDirection: 'row',
   },
   exportButton: {
-    marginTop: 12,
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: 4,
     paddingVertical: 14,
     borderRadius: 14,
     backgroundColor: palette.surface,
     ...raisedBorders,
     alignItems: 'center',
-  },
-  exportButtonDisabled: {
-    opacity: 0.4,
+    justifyContent: 'center',
   },
   exportButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: palette.textPrimary,
+    marginLeft: 8,
+  },
+  exportHint: {
+    fontSize: 12,
+    color: palette.textSecondary,
+    textAlign: 'center',
+    marginTop: 10,
   },
 });

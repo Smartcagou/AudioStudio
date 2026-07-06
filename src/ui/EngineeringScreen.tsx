@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Metronome } from '../audio/metronome/Metronome';
 import { Recorder } from '../audio/recorder/Recorder';
-import { addRecordingToLibrary } from '../library/LibraryManager';
+import { addRecordingToProject } from '../library/ProjectManager';
 import { RootStackParamList } from './navigation';
 import { palette, raisedBorders } from './theme';
 
@@ -14,7 +15,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Engineering'>;
 const MIN_BPM = 40;
 const MAX_BPM = 240;
 
-export function EngineeringScreen({ navigation }: Props) {
+export function EngineeringScreen({ route }: Props) {
+  const { projectId } = route.params;
+
   const metronomeRef = useRef<Metronome | null>(null);
   if (metronomeRef.current === null) {
     metronomeRef.current = new Metronome(getAudioEngine());
@@ -69,15 +72,11 @@ export function EngineeringScreen({ navigation }: Props) {
         const result = recorder.stop();
         setRecording(false);
         setElapsedSec(0);
-        const file = await addRecordingToLibrary(
-          result.path,
-          result.durationSec,
-          result.sizeMb,
-        );
-        setLastSaved(file.filename);
+        const track = await addRecordingToProject(projectId, result.path);
+        setLastSaved(track.name);
         Alert.alert(
           'Enregistrement',
-          `Sauvegarde dans la bibliotheque (${result.durationSec.toFixed(1)} s).`,
+          `Ajoute au projet (${result.durationSec.toFixed(1)} s).`,
         );
       } catch (err) {
         setRecording(false);
@@ -102,7 +101,7 @@ export function EngineeringScreen({ navigation }: Props) {
     setBpm((prev) => Math.min(MAX_BPM, Math.max(MIN_BPM, prev + delta)));
   }
 
-  async function toggle() {
+  async function toggleMetronome() {
     if (running) {
       metronome.stop();
       setRunning(false);
@@ -118,57 +117,45 @@ export function EngineeringScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.navButton}
-        onPress={() => navigation.navigate('Mixer')}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.navButtonText}>Mixage multipiste</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.navButton}
-        onPress={() => navigation.navigate('Looper')}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.navButtonText}>Looper</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionTitle}>Metronome</Text>
-
-      <View style={styles.bpmRow}>
-        <Text style={styles.bpmValue}>{bpm}</Text>
-        <Text style={styles.bpmUnit}>BPM</Text>
+      {/* Métronome compact : une icône encadrée d'un - et d'un +. */}
+      <View style={styles.metronomeRow}>
+        <AdjustButton label="-" onPress={() => changeBpm(-5)} />
+        <TouchableOpacity
+          style={styles.metronomeCore}
+          onPress={toggleMetronome}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name="metronome"
+            size={30}
+            color={running ? palette.accent : palette.textSecondary}
+          />
+          <Text style={[styles.bpmValue, running && styles.bpmValueActive]}>{bpm}</Text>
+          <Text style={styles.bpmUnit}>BPM</Text>
+        </TouchableOpacity>
+        <AdjustButton label="+" onPress={() => changeBpm(5)} />
       </View>
 
-      <View style={styles.adjustRow}>
-        <AdjustButton label="-5" onPress={() => changeBpm(-5)} />
-        <AdjustButton label="-1" onPress={() => changeBpm(-1)} />
-        <AdjustButton label="+1" onPress={() => changeBpm(1)} />
-        <AdjustButton label="+5" onPress={() => changeBpm(5)} />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.toggle, running && styles.toggleActive]}
-        onPress={toggle}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.toggleText, running && styles.toggleTextActive]}>
-          {running ? 'Arreter' : 'Demarrer'}
+      {/* Bouton d'enregistrement central : élément dominant de l'écran. */}
+      <View style={styles.recordArea}>
+        <TouchableOpacity
+          style={styles.recordButton}
+          onPress={toggleRecording}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.recordInner, recording && styles.recordInnerActive]} />
+        </TouchableOpacity>
+        <Text style={styles.elapsed}>
+          {recording ? `${elapsedSec.toFixed(1)} s` : 'Enregistrer'}
         </Text>
-      </TouchableOpacity>
-
-      <View style={styles.divider} />
-
-      <Text style={styles.sectionTitle}>Enregistreur</Text>
-
-      {recording ? (
-        <Text style={styles.elapsed}>{elapsedSec.toFixed(1)} s</Text>
-      ) : (
         <Text style={styles.hint}>
-          {lastSaved ? `Dernier : ${lastSaved}` : 'Le metronome peut tourner pendant la prise.'}
+          {recording
+            ? 'Appuyez pour arreter'
+            : lastSaved
+              ? `Derniere prise : ${lastSaved}`
+              : 'La prise devient une piste du projet.'}
         </Text>
-      )}
+      </View>
 
       <View style={styles.monitorRow}>
         <Text style={styles.controlLabel}>Monitoring</Text>
@@ -186,16 +173,6 @@ export function EngineeringScreen({ navigation }: Props) {
       {monitoring && !recording ? (
         <Text style={styles.warning}>Au casque uniquement (risque de larsen sur haut-parleur).</Text>
       ) : null}
-
-      <TouchableOpacity
-        style={[styles.toggle, recording && styles.toggleRecording]}
-        onPress={toggleRecording}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.toggleText}>
-          {recording ? 'Arreter l enregistrement' : 'Enregistrer'}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -220,93 +197,83 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
   },
-  navButton: {
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: palette.surface,
-    ...raisedBorders,
+  metronomeRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    elevation: 3,
+    justifyContent: 'center',
   },
-  navButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: palette.textPrimary,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: palette.textSecondary,
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  bpmRow: {
+  metronomeCore: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginHorizontal: 20,
+    minWidth: 120,
   },
   bpmValue: {
-    fontSize: 72,
-    fontWeight: '700',
+    fontSize: 40,
+    fontWeight: '800',
     color: palette.textPrimary,
+    marginLeft: 10,
+  },
+  bpmValueActive: {
+    color: palette.accent,
   },
   bpmUnit: {
-    fontSize: 18,
+    fontSize: 14,
     color: palette.textSecondary,
-    marginLeft: 8,
-  },
-  adjustRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 40,
+    marginLeft: 6,
   },
   adjustButton: {
-    flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 16,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: palette.surface,
     ...raisedBorders,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   adjustButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: palette.textPrimary,
   },
-  toggle: {
-    paddingVertical: 18,
-    borderRadius: 14,
+  recordArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordButton: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: palette.accent,
     alignItems: 'center',
-    elevation: 4,
+    justifyContent: 'center',
+    elevation: 6,
   },
-  toggleActive: {
+  recordInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: palette.textOnAccent,
+  },
+  recordInnerActive: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
     backgroundColor: palette.danger,
-  },
-  toggleRecording: {
-    backgroundColor: palette.danger,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: palette.border,
-    marginVertical: 32,
   },
   elapsed: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: palette.danger,
-    textAlign: 'center',
-    marginBottom: 24,
+    fontSize: 36,
+    fontWeight: '800',
+    color: palette.textPrimary,
+    marginTop: 28,
   },
   hint: {
     fontSize: 13,
     color: palette.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginTop: 8,
   },
   monitorRow: {
     flexDirection: 'row',
@@ -341,13 +308,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: palette.danger,
     marginBottom: 16,
-  },
-  toggleText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: palette.textOnAccent,
-  },
-  toggleTextActive: {
-    color: palette.textOnAccent,
   },
 });

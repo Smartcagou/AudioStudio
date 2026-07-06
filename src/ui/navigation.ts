@@ -1,11 +1,14 @@
-// Types de navigation racine. Les écrans des Lots 2 et 3 (ingénierie, export)
-// seront ajoutés ici au fur et à mesure.
+// Types de navigation racine.
+// L'app est organisée autour des projets : Mixer, Looper et Ingénierie
+// travaillent sur les pistes du projet passé en paramètre.
 
 export type RootStackParamList = {
   Home: undefined;
   Player: undefined;
   NowPlaying: undefined;
-  Engineering: undefined;
-  Mixer: undefined;
-  Looper: undefined;
+  Projects: undefined;
+  ProjectDetail: { projectId: string };
+  Engineering: { projectId: string };
+  Mixer: { projectId: string };
+  Looper: { projectId: string };
 };

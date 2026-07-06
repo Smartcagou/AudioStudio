@@ -39,6 +39,9 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function initDatabase(): Promise<void> {
   db = await SQLite.openDatabaseAsync('audiostudio.db');
+  // SQLite désactive les clés étrangères par défaut : à activer par connexion
+  // pour que ON DELETE CASCADE supprime les pistes d'un projet supprimé.
+  await db.execAsync('PRAGMA foreign_keys = ON;');
   await db.execAsync(SCHEMA);
 }
 

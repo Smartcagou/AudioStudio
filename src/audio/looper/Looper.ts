@@ -6,16 +6,18 @@ import {
   FileDirectory,
   FileFormat,
   GainNode,
+  OfflineAudioContext,
 } from 'react-native-audio-api';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 
 import { AudioEngine } from '../engine/AudioEngine';
+import { encodeWav } from '../export/wav';
 
-// Looper synchronisé avec overdub.
+// Looper synchronisé avec overdub, à durée de boucle libre.
+// La boucle de base se règle par tap-to-set : on démarre la prise, on l'arrête,
+// et la longueur captée définit la durée de boucle (pas de grille de tempo).
 // Toutes les couches partagent l'horloge du moteur et un ancrage temporel commun
-// (T0). La longueur de boucle est dérivée du tempo (quantification à la grille),
-// jamais d'une horloge indépendante. La période est verrouillée par loopEnd, donc
-// les couches ne dérivent pas les unes par rapport aux autres.
+// (T0) ; la période est verrouillée par loopEnd, donc les couches ne dérivent pas.
 
 export type LooperState = 'idle' | 'recording' | 'playing';
 
@@ -31,8 +33,6 @@ function wait(ms: number): Promise<void> {
 
 export class Looper {
   private readonly engine: AudioEngine;
-  private bars = 1;
-  private beatsPerBar = 4;
   private loopDurationSec = 0;
   // Origine de la grille de boucle, en temps du contexte audio.
   private anchorTime = 0;
@@ -43,16 +43,6 @@ export class Looper {
 
   constructor(engine: AudioEngine) {
     this.engine = engine;
-  }
-
-  setBars(bars: number): void {
-    if (this.state === 'idle') {
-      this.bars = Math.max(1, Math.round(bars));
-    }
-  }
-
-  getBars(): number {
-    return this.bars;
   }
 
   getState(): LooperState {
@@ -83,27 +73,8 @@ export class Looper {
     return this.master;
   }
 
-  // Frontière de boucle suivante (en temps du contexte), avec une petite avance.
-  private nextBoundary(lookahead = 0.05): number {
-    const now = this.engine.getContext().currentTime + lookahead;
-    const elapsed = now - this.anchorTime;
-    const periods = Math.ceil(elapsed / this.loopDurationSec);
-    return this.anchorTime + periods * this.loopDurationSec;
-  }
-
-  // Capture exactement une longueur de boucle vers un fichier WAV temporaire.
-  // `quantize` attend la prochaine frontière avant de démarrer la prise.
-  private async captureOneLoop(quantize: boolean): Promise<string> {
-    const context = this.engine.getContext();
-
-    if (quantize) {
-      const startAt = this.nextBoundary(0);
-      await wait(Math.max(0, (startAt - context.currentTime) * 1000));
-    } else {
-      // Boucle de base : la prise démarre maintenant et définit l'origine T0.
-      this.anchorTime = context.currentTime;
-    }
-
+  // Arme et démarre un AudioRecorder vers un fichier WAV temporaire en cache.
+  private startRecorder(): AudioRecorder {
     const recorder = new AudioRecorder();
     const enabled = recorder.enableFileOutput({
       format: FileFormat.Wav,
@@ -118,16 +89,23 @@ export class Looper {
     if (started.status === 'error') {
       throw new Error(started.message);
     }
-    this.recorder = recorder;
+    return recorder;
+  }
 
-    await wait(this.loopDurationSec * 1000);
-
+  private stopRecorder(recorder: AudioRecorder): string {
     const result = recorder.stop();
-    this.recorder = null;
     if (result.status === 'error') {
       throw new Error(result.message);
     }
     return result.paths[0];
+  }
+
+  // Frontière de boucle suivante (en temps du contexte), avec une petite avance.
+  private nextBoundary(lookahead = 0.05): number {
+    const now = this.engine.getContext().currentTime + lookahead;
+    const elapsed = now - this.anchorTime;
+    const periods = Math.ceil(elapsed / this.loopDurationSec);
+    return this.anchorTime + periods * this.loopDurationSec;
   }
 
   private addLayer(buffer: AudioBuffer): Layer {
@@ -164,21 +142,30 @@ export class Looper {
     }
   }
 
-  // Enregistre la boucle de base : démarre maintenant, capture une longueur de
-  // boucle, puis lance la lecture en boucle. Définit la grille (T0, durée).
-  async recordBaseLoop(): Promise<void> {
+  // Démarre la prise de la boucle de base (durée libre) : fixe l'origine T0 et
+  // lance la capture. La longueur sera figée à l'arrêt (stopBaseLoop).
+  async startBaseLoop(): Promise<void> {
     if (this.state !== 'idle') return;
     if (!(await this.ensurePermission())) {
       throw new Error('Permission microphone refusee.');
     }
     await this.engine.start();
-    this.loopDurationSec = (60 / this.engine.getTempo()) * this.beatsPerBar * this.bars;
-
+    this.anchorTime = this.engine.getContext().currentTime;
+    this.recorder = this.startRecorder();
     this.state = 'recording';
+  }
+
+  // Arrête la boucle de base : la durée captée devient la longueur de boucle,
+  // puis la couche est lancée en boucle.
+  async stopBaseLoop(): Promise<void> {
+    if (this.state !== 'recording' || !this.recorder) return;
+    const path = this.stopRecorder(this.recorder);
+    this.recorder = null;
     try {
-      const path = await this.captureOneLoop(false);
       const buffer = await this.engine.getContext().decodeAudioData(path);
       await Looper.deleteTemp(path);
+      // La longueur de boucle = longueur réellement captée (durée libre).
+      this.loopDurationSec = buffer.duration;
       const layer = this.addLayer(buffer);
       this.startLayer(layer);
       this.state = 'playing';
@@ -188,12 +175,25 @@ export class Looper {
     }
   }
 
+  // Capture exactement une longueur de boucle, quantifiée à la frontière suivante.
+  private async captureQuantizedLoop(): Promise<string> {
+    const context = this.engine.getContext();
+    const startAt = this.nextBoundary(0);
+    await wait(Math.max(0, (startAt - context.currentTime) * 1000));
+
+    this.recorder = this.startRecorder();
+    await wait(this.loopDurationSec * 1000);
+    const path = this.stopRecorder(this.recorder);
+    this.recorder = null;
+    return path;
+  }
+
   // Ajoute une couche d'overdub par-dessus la boucle en cours, alignée sur la grille.
   async overdub(): Promise<void> {
     if (this.state !== 'playing') return;
     this.state = 'recording';
     try {
-      const path = await this.captureOneLoop(true);
+      const path = await this.captureQuantizedLoop();
       const buffer = await this.engine.getContext().decodeAudioData(path);
       await Looper.deleteTemp(path);
       const layer = this.addLayer(buffer);
@@ -203,6 +203,41 @@ export class Looper {
       this.state = 'playing';
       throw err;
     }
+  }
+
+  // Rend la boucle (somme des couches sur une période) dans un WAV écrit en
+  // Document, et renvoie son URI. Le rendu hors-ligne reproduit ce qu'on entend
+  // en lecture (couches sommées à gain unitaire).
+  async renderLoopToFile(): Promise<string> {
+    if (this.layers.length === 0 || this.loopDurationSec <= 0) {
+      throw new Error('Aucune boucle a sauvegarder.');
+    }
+    const sampleRate = this.engine.getConfig().sampleRate;
+    const length = Math.ceil(this.loopDurationSec * sampleRate);
+
+    const offline = new OfflineAudioContext(2, length, sampleRate);
+    const master = offline.createGain();
+    master.connect(offline.destination);
+
+    for (const layer of this.layers) {
+      const source = offline.createBufferSource();
+      source.buffer = layer.buffer;
+      source.connect(master);
+      source.start(0);
+    }
+
+    const rendered = await offline.startRendering();
+    const left = rendered.getChannelData(0);
+    const right = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : left;
+    const bytes = encodeWav([left, right], rendered.sampleRate);
+
+    const file = new File(Paths.document, `loop-${Date.now()}.wav`);
+    if (file.exists) {
+      file.delete();
+    }
+    file.create();
+    file.write(bytes);
+    return file.uri;
   }
 
   // Retire la dernière couche enregistrée.
@@ -225,6 +260,7 @@ export class Looper {
       this.recorder.stop();
       this.recorder = null;
     }
+    this.loopDurationSec = 0;
     this.state = 'idle';
   }
 }

@@ -1,15 +1,18 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as NavigationBar from 'expo-navigation-bar';
 
 import { palette } from './src/ui/theme';
 
 import { HomeScreen } from './src/ui/HomeScreen';
 import { PlayerScreen } from './src/ui/PlayerScreen';
 import { NowPlayingScreen } from './src/ui/NowPlayingScreen';
+import { ProjectsScreen } from './src/ui/ProjectsScreen';
+import { ProjectDetailScreen } from './src/ui/ProjectDetailScreen';
 import { EngineeringScreen } from './src/ui/EngineeringScreen';
 import { MixerScreen } from './src/ui/MixerScreen';
 import { LooperScreen } from './src/ui/LooperScreen';
@@ -33,9 +36,28 @@ const navTheme: Theme = {
   },
 };
 
+// Mode immersif Android : la barre de navigation système reste cachée et ne
+// réapparaît que transitoirement quand l'utilisateur swipe depuis le bas.
+// Réaffirmé au retour au premier plan (le système peut la réafficher).
+function useImmersiveNavigationBar() {
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const hide = () => {
+      NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+    };
+    hide();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') hide();
+    });
+    return () => subscription.remove();
+  }, []);
+}
+
 export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useImmersiveNavigationBar();
 
   useEffect(() => {
     (async () => {
@@ -92,9 +114,19 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="Projects"
+            component={ProjectsScreen}
+            options={{ title: 'Projets' }}
+          />
+          <Stack.Screen
+            name="ProjectDetail"
+            component={ProjectDetailScreen}
+            options={{ title: 'Projet' }}
+          />
+          <Stack.Screen
             name="Engineering"
             component={EngineeringScreen}
-            options={{ title: 'Ingenierie sonore' }}
+            options={{ title: 'Enregistreur' }}
           />
           <Stack.Screen
             name="Mixer"
