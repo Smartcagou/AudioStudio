@@ -12,9 +12,11 @@ Format : décision ou fait, puis **Pourquoi** et **Impact** sur une ligne chacun
 | --- | -------- | ------ |
 | Lot 1 | Socle : build, lecteur, enregistreur + métronome | Terminé (validé utilisateur 2026-06-17) |
 | Lot 2 | Ingénierie sonore : mixage, looper, effets | Terminé (validé utilisateur 2026-06-17) |
-| Lot 3 | Export et finitions | Non commencé |
+| Lot 3 | Export et finitions | En cours |
 
-**Lot actif :** Lot 3 — export et finitions. Lots 1 et 2 complets et validés sur S21. Lot 2 = mixage multipiste + monitoring faible latence + looper synchronisé (overdub) + effets biquad, branche `lot-2-mixer` poussée.
+**Lot actif :** Lot 3 — export et finitions. Lots 1 et 2 complets et validés sur S21. Lot 2 = mixage multipiste + monitoring faible latence + looper synchronisé (overdub) + effets biquad, branche `lot-2-mixer` poussée. Lot 3 en cours : export WAV mix+stems (validé), export AAC/M4A via module natif local (code prêt, REBUILD REQUIS avant test).
+
+**Contrainte transverse (rappel utilisateur 2026-07-06) : l'app doit tourner 100% hors-ligne.** Runtime déjà propre (aucun appel réseau dans `src`, vérifié). Le module natif d'encodage utilise l'encodeur Android embarqué (MediaCodec/MediaMuxer), aucune dépendance réseau. Durcissement optionnel restant : retirer la permission INTERNET du build release (fin de Lot 3).
 
 ---
 
@@ -116,6 +118,30 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
 
 ## Journal de session
 
+### 2026-07-06 — Session 4 (suite) : refonte UI lecteur (design sombre neumorphique)
+
+- Demande utilisateur : implémenter un design fourni (mockup) AVANT de finir Lot 3 — lecteur sombre neumorphique, art circulaire, scrubber dégradé orange, transport type DAW + écran playlist.
+- **EXCEPTION VALIDÉE UTILISATEUR (déroge à CLAUDE.md "aucune icône dans l'UI") : icônes autorisées UNIQUEMENT sur les écrans Player et NowPlaying.** Le reste de l'app garde des libellés texte. Lib : `@expo/vector-icons` (Ionicons), installée via `expo install` — **pas de rebuild** (assets JS bundlés par Metro, `expo-font` déjà lié nativement dans le dev client, imbriqué sous `node_modules/expo/node_modules/expo-font`).
+- Dégradé du scrubber : **pur JS** (choix utilisateur, sans rebuild) via `src/ui/components/HorizontalGradient.tsx` (segments à couleur interpolée). Pas de expo-linear-gradient.
+- Fichiers : `src/ui/theme.ts` (palette sombre + bordures neumorphiques approx — Android n'a qu'une ombre `elevation`, relief simulé par bordures claires/sombres), `src/ui/NowPlayingScreen.tsx` (art circulaire placeholder note de musique, scrubber cliquable pour seek via `useProgress`+`seekTo`, transport neumorphique), `PlayerScreen.tsx` réécrit (playlist sombre, pill orange sur piste active, bouton play/pause par ligne, mini-barre de lecture qui ouvre NowPlaying). `LibraryPlayer.seekTo` ajouté. `navigation.ts`+`App.tsx` : route `NowPlaying`, `headerShown:false` sur Player+NowPlaying (headers sombres custom avec bouton retour).
+- typecheck OK. Pur JS -> Metro redémarré avec `-c` (nouveau package @expo/vector-icons non résolu par le Metro déjà lancé), app rechargée via deep link. Bundle 1208 modules, aucune erreur logcat, app vivante.
+- A VERIFIER A L'ECRAN (utilisateur) : rendu sombre/neumorphique, pill orange sur piste active, play/pause par ligne, mini-barre, ouverture NowPlaying, scrubber (progression + seek au tap), boutons transport. Réglages fins couleurs/tailles possibles.
+- Coeur (favori) et repeat = visuels/local uniquement (pas de persistance ni logique) pour l'instant.
+- NB : travail NON commité (attente validation visuelle). Ensuite : reprise Lot 3 (export AAC/M4A à valider après rebuild précédent).
+
+### 2026-07-06 — Session 4 : Lot 3 — export AAC/M4A via module natif Android
+
+- Reprise après pause. Rappel utilisateur : contrainte transverse = app 100% hors-ligne. Vérifié : aucun appel réseau dans `src` (grep http/fetch/axios = 0). Runtime déjà hors-ligne. Décision de reprise : continuer Lot 3, cap sur les formats d'export ; **AAC/M4A d'abord** ; partage (expo-sharing) reporté à un rebuild ultérieur (éviter 2 builds risqués sur 8 Go RAM).
+- Problème de fond : `react-native-audio-api` ne produit que du PCM/WAV. Pour AAC/M4A/FLAC/Opus, CLAUDE.md impose l'encodeur média natif d'Android. Aucune dépendance existante ne l'expose -> **module natif Expo local** (pas de dépendance externe, conforme + hors-ligne).
+- `modules/audio-encoder/` créé via `npx create-expo-module --local` (template @57, projet SDK 56 — OK). Élagué : iOS/web/View/types supprimés, `expo-module.config.json` -> `platforms: ["android"]` seul. Autolinking confirmé (`expo-modules-autolinking resolve` voit `expo.modules.audioencoder.AudioEncoderModule`).
+- Encodeur Kotlin `AudioEncoderModule.kt` : `AsyncFunction("encodeWavToM4a")(inputUri, outputUri, bitRate)`. AsyncFunction = thread natif, **ne bloque jamais le fil JS** (contrainte audio CLAUDE.md). Parse l'en-tête WAV (RIFF, blocs fmt/data, robuste aux blocs additionnels + padding), exige PCM 16 bits, encode via `MediaCodec` AAC-LC + mux `MediaMuxer` MP4 (.m4a). Gère EOS, INFO_OUTPUT_FORMAT_CHANGED, BUFFER_FLAG_CODEC_CONFIG. Bitrate 192 kbps.
+- `src/audio/export/Exporter.ts` refactor : `ExportFormat = 'wav' | 'm4a'`. `exportMix(engine, tracks, format)` et `exportTrack(engine, track, format)` remplacent les variantes `*ToWav`. `finalize()` : WAV -> écriture directe Document ; M4A -> WAV temporaire en cache -> `AudioEncoder.encodeWavToM4a` -> Document, temp supprimé. `addExportToLibrary` déduit le type de l'extension (.m4a OK, pas de modif).
+- `src/ui/MixerScreen.tsx` : sélecteur de format WAV/M4A, boutons "Exporter le mix (WAV|M4A)" + "Exporter les pistes" pilotés par le format choisi.
+- typecheck OK. **REBUILD REQUIS** (code natif ajouté) : `npx expo run:android` — étape à risque de gel sur 8 Go (fermer Chrome, ou basculer `eas build -p android --profile preview`). Fast Refresh ne recharge pas le natif.
+- A VERIFIER A L'USAGE après rebuild : Mixer > Format M4A > Exporter le mix -> fichier mix-*.m4a dans le Lecteur, lisible, taille << WAV. Idem stems. WAV inchangé.
+- MP3 toujours non fourni (cas LAME). FLAC/Opus = extension future du même module (autre MIME MediaCodec). Partage (expo-sharing) + durcissement permission INTERNET = suite Lot 3.
+- NB commits : travail stems (Exporter/MixerScreen) + ce lot natif non encore commités (attente validation utilisateur post-rebuild).
+
 ### 2026-06-17 — Session 3 (suite 5) : Lot 2 complet + début Lot 3 (export mix WAV)
 
 - Lot 2 TERMINE ET VALIDE : mixage multipiste + monitoring + looper + effets biquad. Tout sur branche `lot-2-mixer` (4 commits, poussés).
@@ -126,7 +152,11 @@ Second crash New Arch (même patch) : à l'émission d'événements (`loadQueue`
   - `src/ui/MixerScreen.tsx` : bouton "Exporter le mix (WAV)" -> rendu + ajout biblio + alerte.
 - Pur JS (OfflineAudioContext + expo-file-system), pas de rebuild. typecheck OK, bundle rechargé sans crash.
 - A VERIFIER A L'USAGE : Mixer > Exporter le mix (WAV) -> fichier mix-*.wav créé, apparait dans le Lecteur, lecture = somme des pistes avec gain/pan/filtres appliqués.
-- Reste Lot 3 : partage (expo-sharing -> NATIVE, rebuild requis), autres formats (AAC/M4A/FLAC/Opus via encodeur Android ; MP3 = cas LAME), export par piste, paramètres d'encodage, lecture arrière-plan (track-player gère déjà la notif). Export WAV à commiter une fois validé.
+- Export WAV mix VALIDE UTILISATEUR. Commité + poussé (lot-2-mixer).
+- Question utilisateur (offline) : confirmé que l'appli fonctionne 100% hors-ligne au runtime (aucun appel réseau dans src, SQLite+fichiers locaux, moteurs audio locaux). Seules dépendances internet = dev (Metro dev client) et build cloud EAS (alternative: build local Gradle). Durcissement possible : retirer permission INTERNET du build release (à faire en fin de Lot 3 si souhaité).
+- Export par piste (stems) : `Exporter.ts` refactorisé avec `renderTracksToWav` partagé ; `exportTrackToWav(engine, track)` rend une piste seule (gain/pan/filtre, mute ignoré) -> fichier stem-<nom>-*.wav ajouté à la biblio. Bouton "Exporter les pistes" dans MixerScreen (boucle sur les pistes). typecheck OK, pur JS, sans crash.
+- A VERIFIER A L'USAGE : "Exporter les pistes" -> un WAV par piste dans le Lecteur (stem-<nom>).
+- Reste Lot 3 : partage (expo-sharing -> NATIVE, rebuild requis), autres formats (AAC/M4A/FLAC/Opus via encodeur Android ; MP3 = cas LAME), paramètres d'encodage, lecture arrière-plan (track-player gère déjà la notif). Stems à commiter une fois validés.
 
 ### 2026-06-17 — Session 3 (suite 4) : commit/push Lot 1 + début Lot 2 (mixage multipiste)
 

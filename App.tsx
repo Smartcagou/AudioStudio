@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { HomeScreen } from './src/ui/HomeScreen';
 import { PlayerScreen } from './src/ui/PlayerScreen';
+import { NowPlayingScreen } from './src/ui/NowPlayingScreen';
 import { EngineeringScreen } from './src/ui/EngineeringScreen';
 import { MixerScreen } from './src/ui/MixerScreen';
 import { LooperScreen } from './src/ui/LooperScreen';
@@ -60,7 +61,12 @@ export default function App() {
           <Stack.Screen
             name="Player"
             component={PlayerScreen}
-            options={{ title: 'Lecteur' }}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NowPlaying"
+            component={NowPlayingScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Engineering"

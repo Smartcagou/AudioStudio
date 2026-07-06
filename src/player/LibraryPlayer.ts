@@ -67,3 +67,7 @@ export async function skipToNext(): Promise<void> {
 export async function skipToPrevious(): Promise<void> {
   await TrackPlayer.skipToPrevious();
 }
+
+export async function seekTo(positionSec: number): Promise<void> {
+  await TrackPlayer.seekTo(Math.max(0, positionSec));
+}

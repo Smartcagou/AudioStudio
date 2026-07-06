@@ -4,6 +4,7 @@
 export type RootStackParamList = {
   Home: undefined;
   Player: undefined;
+  NowPlaying: undefined;
   Engineering: undefined;
   Mixer: undefined;
   Looper: undefined;
