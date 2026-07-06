@@ -2,7 +2,8 @@
 // Natif : WAV, PCM en écriture directe ; AAC, M4A, FLAC, Opus via l'encodeur Android.
 // MP3 : non natif, nécessite une bibliothèque dédiée (LAME). Toujours signaler l'absence d'encodeur.
 //
-// Lot 3, première étape : rendu du mix final en WAV via un contexte hors-ligne.
+// Lot 3 : rendu du mix final hors-ligne (WAV), puis ré-encodage AAC/M4A via le
+// module natif MediaCodec/MediaMuxer (modules/audio-encoder). Tout est local.
 
 import { OfflineAudioContext } from 'react-native-audio-api';
 import { File, Paths } from 'expo-file-system';
@@ -10,35 +11,38 @@ import { File, Paths } from 'expo-file-system';
 import { AudioEngine } from '../engine/AudioEngine';
 import { dbToLinear, TrackInfo } from '../mixer/Track';
 import { encodeWav } from './wav';
+import AudioEncoder from '../../../modules/audio-encoder';
 
-export type ExportFormat = 'wav' | 'pcm' | 'aac' | 'm4a' | 'flac' | 'opus' | 'mp3';
+export type ExportFormat = 'wav' | 'm4a';
+
+// Débit AAC pour l'export compressé (M4A). 192 kbps : bon compromis qualité/taille.
+const AAC_BITRATE = 192_000;
 
 export interface MixExportResult {
   path: string;
   durationSec: number;
 }
 
-// Rend toutes les pistes (gain, pan, filtre) dans un contexte hors-ligne, puis
-// écrit un fichier WAV. Le rendu hors-ligne est plus rapide que le temps réel et
-// somme les pistes exactement comme le mixer en lecture.
-export async function exportMixToWav(
+function safeName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+// Rend une liste de pistes (gain, pan, filtre) dans un contexte hors-ligne et
+// renvoie les octets WAV. Le rendu hors-ligne somme les pistes exactement comme
+// le mixer en lecture, plus vite que le temps réel.
+async function renderTracksToWav(
   engine: AudioEngine,
   tracks: TrackInfo[],
-): Promise<MixExportResult> {
-  const playable = tracks.filter((track) => !track.muted && track.durationSec > 0);
-  if (playable.length === 0) {
-    throw new Error('Aucune piste a exporter.');
-  }
-
+): Promise<{ bytes: Uint8Array; durationSec: number }> {
   const sampleRate = engine.getConfig().sampleRate;
-  const durationSec = Math.max(...playable.map((track) => track.durationSec));
+  const durationSec = Math.max(...tracks.map((track) => track.durationSec));
   const length = Math.ceil(durationSec * sampleRate);
 
   const offline = new OfflineAudioContext(2, length, sampleRate);
   const master = offline.createGain();
   master.connect(offline.destination);
 
-  for (const track of playable) {
+  for (const track of tracks) {
     const buffer = await offline.decodeAudioData(track.uri);
 
     const gain = offline.createGain();
@@ -66,14 +70,75 @@ export async function exportMixToWav(
   const rendered = await offline.startRendering();
   const left = rendered.getChannelData(0);
   const right = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : left;
-  const wav = encodeWav([left, right], rendered.sampleRate);
+  return { bytes: encodeWav([left, right], rendered.sampleRate), durationSec };
+}
 
-  const file = new File(Paths.document, `mix-${Date.now()}.wav`);
+// Écrit directement un WAV dans le répertoire de documents.
+function writeWavToDocument(prefix: string, bytes: Uint8Array): string {
+  const file = new File(Paths.document, `${prefix}-${Date.now()}.wav`);
   if (file.exists) {
     file.delete();
   }
   file.create();
-  file.write(wav);
+  file.write(bytes);
+  return file.uri;
+}
 
-  return { path: file.uri, durationSec };
+// Ré-encode les octets WAV en AAC/M4A via le module natif. L'encodeur natif lit
+// un fichier : on passe par un WAV temporaire en cache, supprimé ensuite.
+async function encodeToM4a(prefix: string, bytes: Uint8Array): Promise<string> {
+  const temp = new File(Paths.cache, `render-${Date.now()}.wav`);
+  if (temp.exists) {
+    temp.delete();
+  }
+  temp.create();
+  temp.write(bytes);
+
+  const outUri = new File(Paths.document, `${prefix}-${Date.now()}.m4a`).uri;
+  try {
+    return await AudioEncoder.encodeWavToM4a(temp.uri, outUri, AAC_BITRATE);
+  } finally {
+    if (temp.exists) {
+      temp.delete();
+    }
+  }
+}
+
+async function finalize(
+  prefix: string,
+  bytes: Uint8Array,
+  durationSec: number,
+  format: ExportFormat,
+): Promise<MixExportResult> {
+  if (format === 'm4a') {
+    return { path: await encodeToM4a(prefix, bytes), durationSec };
+  }
+  return { path: writeWavToDocument(prefix, bytes), durationSec };
+}
+
+// Exporte le mix complet (toutes les pistes non muettes sommées).
+export async function exportMix(
+  engine: AudioEngine,
+  tracks: TrackInfo[],
+  format: ExportFormat,
+): Promise<MixExportResult> {
+  const playable = tracks.filter((track) => !track.muted && track.durationSec > 0);
+  if (playable.length === 0) {
+    throw new Error('Aucune piste a exporter.');
+  }
+  const { bytes, durationSec } = await renderTracksToWav(engine, playable);
+  return finalize('mix', bytes, durationSec, format);
+}
+
+// Exporte une seule piste (avec son gain/pan/filtre), indépendamment du mute.
+export async function exportTrack(
+  engine: AudioEngine,
+  track: TrackInfo,
+  format: ExportFormat,
+): Promise<MixExportResult> {
+  if (track.durationSec <= 0) {
+    throw new Error('Piste vide.');
+  }
+  const { bytes, durationSec } = await renderTracksToWav(engine, [{ ...track, muted: false }]);
+  return finalize(`stem-${safeName(track.name)}`, bytes, durationSec, format);
 }

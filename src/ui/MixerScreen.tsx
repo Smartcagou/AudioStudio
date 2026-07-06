@@ -12,7 +12,7 @@ import {
 import { getAudioEngine } from '../audio/engine/AudioEngine';
 import { Mixer } from '../audio/mixer/Mixer';
 import { TrackFilterType, TrackInfo } from '../audio/mixer/Track';
-import { exportMixToWav } from '../audio/export/Exporter';
+import { ExportFormat, exportMix, exportTrack } from '../audio/export/Exporter';
 import { addExportToLibrary, listFiles } from '../library/LibraryManager';
 
 export function MixerScreen() {
@@ -26,6 +26,7 @@ export function MixerScreen() {
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [format, setFormat] = useState<ExportFormat>('wav');
 
   const refresh = useCallback(() => {
     setTracks(mixer.getTracks().map((t) => t.getInfo()));
@@ -117,12 +118,33 @@ export function MixerScreen() {
     if (exporting) return;
     setExporting(true);
     try {
-      const result = await exportMixToWav(
+      const result = await exportMix(
         getAudioEngine(),
         mixer.getTracks().map((t) => t.getInfo()),
+        format,
       );
       const file = await addExportToLibrary(result.path, result.durationSec);
       Alert.alert('Export', `Mix exporte (${result.durationSec.toFixed(1)} s) : ${file.filename}`);
+    } catch (err) {
+      Alert.alert('Export', err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function onExportStems() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const engine = getAudioEngine();
+      const exportable = mixer.getTracks().filter((t) => t.getInfo().durationSec > 0);
+      let count = 0;
+      for (const track of exportable) {
+        const result = await exportTrack(engine, track.getInfo(), format);
+        await addExportToLibrary(result.path, result.durationSec);
+        count += 1;
+      }
+      Alert.alert('Export', `${count} piste${count > 1 ? 's' : ''} exportee${count > 1 ? 's' : ''}.`);
     } catch (err) {
       Alert.alert('Export', err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -219,6 +241,12 @@ export function MixerScreen() {
           <Text style={styles.playButtonText}>{playing ? 'Arreter' : 'Tout lire'}</Text>
         </TouchableOpacity>
 
+        <View style={styles.controlRow}>
+          <Text style={styles.controlLabel}>Format</Text>
+          <PanButton label="WAV" active={format === 'wav'} onPress={() => setFormat('wav')} />
+          <PanButton label="M4A" active={format === 'm4a'} onPress={() => setFormat('m4a')} />
+        </View>
+
         <TouchableOpacity
           style={[styles.exportButton, (exporting || tracks.length === 0) && styles.exportButtonDisabled]}
           onPress={onExport}
@@ -226,8 +254,17 @@ export function MixerScreen() {
           disabled={exporting || tracks.length === 0}
         >
           <Text style={styles.exportButtonText}>
-            {exporting ? 'Export en cours' : 'Exporter le mix (WAV)'}
+            {exporting ? 'Export en cours' : `Exporter le mix (${format.toUpperCase()})`}
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.exportButton, (exporting || tracks.length === 0) && styles.exportButtonDisabled]}
+          onPress={onExportStems}
+          activeOpacity={0.7}
+          disabled={exporting || tracks.length === 0}
+        >
+          <Text style={styles.exportButtonText}>Exporter les pistes</Text>
         </TouchableOpacity>
       </View>
     </View>
